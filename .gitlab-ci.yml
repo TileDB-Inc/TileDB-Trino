@@ -1,0 +1,48 @@
+variables:
+  # This will supress any download for dependencies and plugins or upload messages which would clutter the console log.
+  # `showDateTime` will show the passed time in milliseconds. You need to specify `--batch-mode` to make this work.
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version -DinstallAtEnd=true -DdeployAtEnd=true -e -X"
+  MAVEN_OPTS: "-Xmx512M -XX:+ExitOnOutOfMemoryError -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true"
+  MAVEN_SKIP_CHECKS_AND_DOCS: "-Dair.check.skip-all=true -Dmaven.javadoc.skip=true"
+  MAVEN_FAST_INSTALL: "-DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -B -q -T C1"
+  JAVA_OPTS: "-Xmx512M -XX:+ExitOnOutOfMemoryError -Djdk.net.URLClassPath.disableClassPathURLCheck=true"
+  TEST_FLAGS: ""
+
+# Cache downloaded dependencies and plugins between builds.
+# To keep cache across branches add 'key: "$CI_JOB_NAME"'
+cache:
+  paths:
+    - .m2/repository
+
+# Build base docker image used for unit testing, only do this on manual trigger
+docker_build_base_image:
+  image: docker:git
+  services:
+    - docker:dind
+  stage: build
+  variables:
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/base-tiledb-java:dev"
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay
+
+  tags:
+    - docker
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $IMAGE_TAG -f docker/Dockerfile-base-tiledb-java .
+    - docker push $IMAGE_TAG
+  when: manual
+
+# Validate merge requests using JDK8
+jdk8:
+  #image: openjdk:8
+  image: ${CI_REGISTRY_IMAGE}/base-tiledb-java:dev
+  stage: test
+  tags:
+    - docker
+  variables:
+    TEST_SPECIFIC_MODULES: presto-tiledb
+  script:
+    - ./mvnw -v
+    - ./mvnw install $MAVEN_FAST_INSTALL -am
+    - ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B $TEST_FLAGS
