@@ -21,7 +21,7 @@ docker_build_base_image:
     - docker:dind
   stage: build
   variables:
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/base-tiledb-java:dev"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}"
     DOCKER_HOST: tcp://docker:2375/
     DOCKER_DRIVER: overlay
 
@@ -29,14 +29,13 @@ docker_build_base_image:
     - docker
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $IMAGE_TAG -f docker/Dockerfile-base-tiledb-java .
+    - docker build -t $IMAGE_TAG .
     - docker push $IMAGE_TAG
   when: manual
 
 # Validate merge requests using JDK8
 jdk8:
-  #image: openjdk:8
-  image: ${CI_REGISTRY_IMAGE}/base-tiledb-java:dev
+  image: openjdk:8
   stage: test
   tags:
     - docker
