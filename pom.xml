@@ -11,7 +11,6 @@
 
     <artifactId>presto-tiledb</artifactId>
     <description>Presto - TileDB Connector</description>
-    <packaging>presto-plugin</packaging>
 
     <dependencies>
         <dependency>
@@ -172,6 +171,30 @@
                 <configuration>
                     <useSystemClassLoader>false</useSystemClassLoader>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.1</version>
+                <configuration>
+                    <!-- put your configurations here -->
+                    <packaging>presto-plugin</packaging>
+                    <transformers>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                            <resource>META-INF/services/com.facebook.presto.spi.Plugin</resource>
+                            <file>src/main/resources/services/com.facebook.presto.spi.Plugin</file>
+                        </transformer>
+                    </transformers>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
