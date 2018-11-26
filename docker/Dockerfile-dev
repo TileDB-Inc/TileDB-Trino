@@ -21,16 +21,10 @@ ADD https://repo1.maven.org/maven2/com/facebook/presto/presto-cli/${PRESTO_VERSI
 
 RUN chmod +x ${PRESTO_HOME}/bin/presto-cli-${PRESTO_VERSION}-executable.jar
 
-ARG PRESTO_TILEDB_VERSION=latest
+# Copy plugin to build
+COPY . /tmp/presto-build
 
-# Download latest presto release
-RUN mkdir ${PRESTO_HOME}/plugin/tiledb && \
-    cd ${PRESTO_HOME}/plugin/tiledb && \
-    curl -s https://api.github.com/repos/TileDB-Inc/TileDB-Presto/releases/${PRESTO_TILEDB_VERSION} \
-    | grep "browser_download_url.*jar" \
-    | cut -d : -f 2,3 \
-    | tr -d \" \
-    | wget -i -
+WORKDIR /tmp/presto-build
 
 # Add entry script to start presto server and cli
 ADD docker/entrypoint.sh ${PRESTO_HOME}/bin/
@@ -40,7 +34,17 @@ RUN chmod +x ${PRESTO_HOME}/bin/entrypoint.sh
 # Add example arrays
 ADD src/test/resources/tiledb_arrays /opt/tiledb_example_arrays
 
+# Build presto and copy package to PRESTO_HOME and purge build
+RUN ./mvnw package -DskipTests && \
+    mkdir ${PRESTO_HOME}/plugin/tiledb && \
+    cp target/presto-tiledb-${PRESTO_VERSION}.jar ${PRESTO_HOME}/plugin/tiledb/presto-tiledb-${PRESTO_VERSION}.jar && \
+    ./mvnw clean && \
+    rm -rf ${HOME}/.m2
+
 WORKDIR ${PRESTO_HOME}
+
+# Remove plugin sources
+RUN rm -r /tmp/presto-build
 
 # Add configuration parameters
 COPY docker/etc ${PRESTO_HOME}/etc
