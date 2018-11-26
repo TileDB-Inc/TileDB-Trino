@@ -1,43 +1,82 @@
 # TileDB Presto Connector
 
-This connector allows prestodb to issue queries against a single tiledb array.
+[![Build Status](https://gitlab.com/TileDB-Inc/TileDB-Presto/badges/master/build.svg)](https://gitlab.com/TileDB-Inc/TileDB-Presto/pipelines)
 
+This connector allows running sql on TileDB arrays via Presto.
+
+## Usage
+
+The TileDB presto connector supports most sql operations from prestodb. Arrays
+can be references dynamically and are not required to be "pre-registered"
+with presto. To query a tiledb array simply reference the URI in the from
+clause. i.e:
+
+```
+show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global"
+```
+
+Example select:
+
+```
+select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" WHERE rows = 3 AND cols between 1 and 2;
+ rows | cols | a 
+------+------+---
+    3 |    1 | 5 
+    3 |    2 | 6 
+
+```
+
+Presto uses the form of `catalog`.`schema`.`table_name` for querying. TileDB
+does not have a concept of a schema, so any valid string can be used for the 
+schema name when querying. `tiledb` is used for convenience in the examples.
+`table_name` will be the array uri and can be local or remote (s3).
+
+## Docker
+
+A quickstart docker image is available. The docker image will start a single
+node presto cluster and open the cli presto interface where sql can be run.
+The docker images includes two example tiledb arrays
+`/opt/tiledb_example_arrays/dense_global` and
+`/opt/tiledb_example_arrays/sparse_global` .
+
+```
+docker run -it --rm tiledb/presto-tiledb
+
+presto> show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global"
+```
 
 ## Installation
 
 Currently this connector is built as a plugin. It must be packaged and
 installed on the presto instances.
 
-### Building Connector
+### Latest Release
+
+Download the [latest release](https://github.com/TileDB-Inc/presto-tiledb/releases/latest)
+and skip to the section
+[Installation on existing Presto instance](#Installation-on-existing-Presto-instance)
+
+### Building Connector From Source
 
 The tiledb connector can be built using the following command from the
 top level directory of the presto source.
 ```
-./mvnw install 
+./mvnw package
 ```
 
 Tests can be skipped by adding `-DskipTests`
 
 ```
-./mvnw install -DskipTests
-```
-
-#### Packaging
-
-To package for deployment to remote presto instance use the package
-maven command
-
-``` 
 ./mvnw package -DskipTests
 ```
 
-#### Installation on existing Presto instance
+### Installation on existing Presto instance
 
 If you are installing the plugin on an existing presto, such as amazon
 EMR, then you need to copy the `target/presto-tiledb-$VERSION` folder
 to a `tiledb` directory under the plugin directory on echo presto node.
 
-##### EMR Instruction
+#### EMR Instruction
 
 Using amazon emr `target/presto-tiledb-$VERSION` needs to be copied to
 `/usr/lib/presto/plugin/tiledb/`
