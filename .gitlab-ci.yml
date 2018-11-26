@@ -2,7 +2,7 @@ variables:
   # This will supress any download for dependencies and plugins or upload messages which would clutter the console log.
   # `showDateTime` will show the passed time in milliseconds. You need to specify `--batch-mode` to make this work.
   MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version -DinstallAtEnd=true -DdeployAtEnd=true -e -X"
-  MAVEN_OPTS: "-Xmx512M -XX:+ExitOnOutOfMemoryError -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true"
+  MAVEN_OPTS: "-Xmx512M -XX:+ExitOnOutOfMemoryError -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
   MAVEN_SKIP_CHECKS_AND_DOCS: "-Dair.check.skip-all=true -Dmaven.javadoc.skip=true"
   MAVEN_FAST_INSTALL: "-DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -B -q -T C1"
   JAVA_OPTS: "-Xmx512M -XX:+ExitOnOutOfMemoryError -Djdk.net.URLClassPath.disableClassPathURLCheck=true"
@@ -45,3 +45,15 @@ jdk8:
     - ./mvnw -v
     - ./mvnw install $MAVEN_FAST_INSTALL -am
     - ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B $TEST_FLAGS
+
+deploy_artifact:
+  image: openjdk:8
+  stage: deploy
+  script:
+    - ./mvnw package -DskipTests
+    - ./mvnw help:evaluate -N -Dexpression=project.version|grep -v '\['
+    - export PROJECT_VERSION=$(./mvnw help:evaluate -N -Dexpression=project.version|grep -v '\['); echo ${PROJECT_VERSION}
+    - mv target/presto-tiledb-${PROJECT_VERSION}.jar target/presto-tiledb-${CI_COMMIT_REF_NAME}.jar
+    - TRACE=1 ./ci/upload-github-release-asset.sh github_api_token=${GITHUB_TOKEN} owner=TileDB-Inc repo=TileDB-Presto tag=${CI_COMMIT_REF_NAME} filename=target/presto-tiledb-${CI_COMMIT_REF_NAME}.jar
+  only:
+    - tags
