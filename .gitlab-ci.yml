@@ -1,3 +1,9 @@
+stages:
+  - build
+  - test
+  - deploy
+  - deploy_docker
+
 variables:
   # This will supress any download for dependencies and plugins or upload messages which would clutter the console log.
   # `showDateTime` will show the passed time in milliseconds. You need to specify `--batch-mode` to make this work.
@@ -13,25 +19,6 @@ variables:
 cache:
   paths:
     - .m2/repository
-
-# Build base docker image used for unit testing, only do this on manual trigger
-docker_build_base_image:
-  image: docker:git
-  services:
-    - docker:dind
-  stage: build
-  variables:
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}"
-    DOCKER_HOST: tcp://docker:2375/
-    DOCKER_DRIVER: overlay
-
-  tags:
-    - docker
-  script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $IMAGE_TAG .
-    - docker push $IMAGE_TAG
-  when: manual
 
 # Validate merge requests using JDK8
 jdk8:
@@ -55,5 +42,27 @@ deploy_artifact:
     - export PROJECT_VERSION=$(./mvnw help:evaluate -N -Dexpression=project.version|grep -v '\['); echo ${PROJECT_VERSION}
     - mv target/presto-tiledb-${PROJECT_VERSION}.jar target/presto-tiledb-${CI_COMMIT_REF_NAME}.jar
     - TRACE=1 ./ci/upload-github-release-asset.sh github_api_token=${GITHUB_TOKEN} owner=TileDB-Inc repo=TileDB-Presto tag=${CI_COMMIT_REF_NAME} filename=target/presto-tiledb-${CI_COMMIT_REF_NAME}.jar
+  only:
+    - tags
+
+# Build base docker image used for unit testing, only do this for tagged releases
+docker_build_image:
+  image: docker:git
+  services:
+    - docker:dind
+  stage: deploy_docker
+  variables:
+    IMAGE_TAG: "tiledb/tiledb-presto:${CI_COMMIT_REF_NAME}"
+    IMAGE_TAG_LATEST: "tiledb/tiledb-presto:latest"
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay
+  tags:
+    - docker
+  script:
+    - docker login -u $DOCKER_HUB_USERNAME -p $DOCKER_HUB_PASSWORD
+    - docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+    - docker tag $IMAGE_TAG $IMAGE_TAG_LATEST
+    - docker push $IMAGE_TAG_LATEST
   only:
     - tags
