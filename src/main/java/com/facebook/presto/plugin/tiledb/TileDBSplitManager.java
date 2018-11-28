@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
 import static com.facebook.presto.spi.predicate.Utils.nativeValueToBlock;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -208,7 +209,7 @@ public class TileDBSplitManager
         boolean maxFromNonEmptyDomain = true;
         // Number of buckets is 1 more thank number of splits (i.e. split 1 time into two buckets)
         // Only long dimensions can be split with naive algorithm
-        if (range.getType().getJavaType() == long.class) {
+        if (!REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
             long min = (Long) ConvertUtils.convert(nonEmptyDomain.getFirst(), Long.class);
             if (range.getLow().getValueBlock().isPresent()) {
                 min = (Long) range.getLow().getValue();
@@ -257,6 +258,9 @@ public class TileDBSplitManager
                 // Set the low value to the high+1 for the next range split
                 low = high + 1;
             }
+        }
+        else {
+            ranges.add(range);
         }
         return ranges;
     }

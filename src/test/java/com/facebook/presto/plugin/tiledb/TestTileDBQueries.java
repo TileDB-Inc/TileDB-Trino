@@ -28,7 +28,11 @@ import org.testng.annotations.Test;
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static com.facebook.presto.plugin.tiledb.TileDBQueryRunner.createTileDBQueryRunner;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
+import static com.facebook.presto.spi.type.TinyintType.TINYINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static java.lang.String.format;
@@ -100,7 +104,7 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testCreate1DVectorAllDimensions()
+    public void testCreate1DVectorTinyInt()
     {
         String arrayName = "test_create_tinyint";
         // Tinyint
@@ -114,75 +118,167 @@ public class TestTileDBQueries
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
-        dropArray(arrayName);
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(cast(0 as tinyint), 10), (cast(3 as tinyint), 13), (cast(5 as tinyint), 15)", arrayName);
+        getQueryRunner().execute(insertSql);
 
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TINYINT, INTEGER)
+                .row((byte) 0, 10)
+                .row((byte) 3, 13)
+                .row((byte) 5, 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorSmallInt()
+    {
         // Smallint
-        arrayName = "test_create_smallint";
+        String arrayName = "test_create_smallint";
         dropArray(arrayName);
         create1DVectorSmallIntDimension(arrayName);
 
-        desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("x", "smallint", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
-        dropArray(arrayName);
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(cast(0 as smallint), 10), (cast(3 as smallint), 13), (cast(5 as smallint), 15)", arrayName);
+        getQueryRunner().execute(insertSql);
 
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), SMALLINT, INTEGER)
+                .row((short) 0, 10)
+                .row((short) 3, 13)
+                .row((short) 5, 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorInteger()
+    {
         // Integer
-        arrayName = "test_create_integer";
+        String arrayName = "test_create_integer";
         dropArray(arrayName);
         create1DVectorIntegerDimension(arrayName);
 
-        desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("x", "integer", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
-        dropArray(arrayName);
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0, 10), (3, 13), (5, 15)", arrayName);
+        getQueryRunner().execute(insertSql);
 
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, INTEGER)
+                .row((int) 0, 10)
+                .row((int) 3, 13)
+                .row((int) 5, 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorBigInt()
+    {
         // BigInt
-        arrayName = "test_create_bigint";
+        String arrayName = "test_create_bigint";
         dropArray(arrayName);
         create1DVector(arrayName);
 
-        desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("x", "bigint", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
-        dropArray(arrayName);
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0, 10), (3, 13), (5, 15)", arrayName);
+        getQueryRunner().execute(insertSql);
 
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .row((long) 0, 10)
+                .row((long) 3, 13)
+                .row((long) 5, 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorReal()
+    {
         // Real
-        arrayName = "test_create_real";
+        String arrayName = "test_create_real";
         dropArray(arrayName);
         create1DVectorRealDimension(arrayName);
 
-        desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("x", "real", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
-        dropArray(arrayName);
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0.0, 10), (3.0, 13), (5.0, 15)", arrayName);
+        getQueryRunner().execute(insertSql);
 
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), REAL, INTEGER)
+                .row((float) 0.0, 10)
+                .row((float) 3.0, 13)
+                .row((float) 5.0, 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorDouble()
+    {
         // Double
-        arrayName = "test_create_double";
+        String arrayName = "test_create_double";
         dropArray(arrayName);
         create1DVectorDoubleDimension(arrayName);
 
-        desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("x", "double", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0.0, 10), (3.0, 13), (5.0, 15)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), DOUBLE, INTEGER)
+                .row((double) 0, 10)
+                .row((double) 3, 13)
+                .row((double) 5, 15)
+                .build());
 
         dropArray(arrayName);
     }

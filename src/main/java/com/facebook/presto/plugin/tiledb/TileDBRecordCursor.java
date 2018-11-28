@@ -60,6 +60,7 @@ import static io.tiledb.java.api.QueryStatus.TILEDB_COMPLETED;
 import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
 import static io.tiledb.java.api.QueryStatus.TILEDB_UNINITIALIZED;
 import static io.tiledb.java.api.Types.getJavaType;
+import static java.lang.Float.floatToRawIntBits;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -957,6 +958,11 @@ public class TileDBRecordCursor
             case TILEDB_UINT64:
             case TILEDB_INT64: {
                 value = ((long[]) fieldArray)[index];
+                break;
+            }
+            // Presto converts 32bit floats to long types
+            case TILEDB_FLOAT32: {
+                value = ((Integer) floatToRawIntBits(((float[]) fieldArray)[index])).longValue();
                 break;
             }
         }
