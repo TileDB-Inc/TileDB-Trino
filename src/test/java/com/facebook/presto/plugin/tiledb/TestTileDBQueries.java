@@ -130,6 +130,13 @@ public class TestTileDBQueries
                 .row((byte) 5, 15)
                 .build());
 
+        selectSql = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TINYINT, INTEGER)
+                .row((byte) 3, 13)
+                .row((byte) 5, 15)
+                .build());
+
         dropArray(arrayName);
     }
 
@@ -156,6 +163,13 @@ public class TestTileDBQueries
         MaterializedResult selectResult = computeActual(selectSql);
         assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), SMALLINT, INTEGER)
                 .row((short) 0, 10)
+                .row((short) 3, 13)
+                .row((short) 5, 15)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), SMALLINT, INTEGER)
                 .row((short) 3, 13)
                 .row((short) 5, 15)
                 .build());
@@ -190,6 +204,13 @@ public class TestTileDBQueries
                 .row((int) 5, 15)
                 .build());
 
+        selectSql = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, INTEGER)
+                .row((int) 3, 13)
+                .row((int) 5, 15)
+                .build());
+
         dropArray(arrayName);
     }
 
@@ -216,6 +237,13 @@ public class TestTileDBQueries
         MaterializedResult selectResult = computeActual(selectSql);
         assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
                 .row((long) 0, 10)
+                .row((long) 3, 13)
+                .row((long) 5, 15)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
                 .row((long) 3, 13)
                 .row((long) 5, 15)
                 .build());
@@ -250,6 +278,13 @@ public class TestTileDBQueries
                 .row((float) 5.0, 15)
                 .build());
 
+        selectSql = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), REAL, INTEGER)
+                .row((float) 3.0, 13)
+                .row((float) 5.0, 15)
+                .build());
+
         dropArray(arrayName);
     }
 
@@ -278,6 +313,13 @@ public class TestTileDBQueries
                 .row((double) 0, 10)
                 .row((double) 3, 13)
                 .row((double) 5, 15)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), DOUBLE, INTEGER)
+                .row((double) 3.0, 13)
+                .row((double) 5.0, 15)
                 .build());
 
         dropArray(arrayName);

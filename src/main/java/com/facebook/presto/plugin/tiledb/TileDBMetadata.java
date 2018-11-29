@@ -64,9 +64,11 @@ import java.util.stream.Collectors;
 
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
+import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -156,13 +158,21 @@ public class TileDBMetadata
                             Object nonEmptyMin = domain.getFirst();
                             Object nonEmptyMax = domain.getSecond();
                             Type type = columnHandle.getColumnType();
+
+                            Range range;
+                            if (REAL.equals(type)) {
+                                range = Range.range(type, ((Integer) floatToRawIntBits((Float) nonEmptyMin)).longValue(), true,
+                                        ((Integer) floatToRawIntBits((Float) nonEmptyMax)).longValue(), true);
+                            }
+                            else {
+                                range = Range.range(type,
+                                        ConvertUtils.convert(nonEmptyMin, type.getJavaType()), true,
+                                        ConvertUtils.convert(nonEmptyMax, type.getJavaType()), true);
+                            }
+
                             enforceableDimensionDomains.put(
                                     dimensionHandle,
-                                    Domain.create(ValueSet.ofRanges(
-                                            Range.range(type,
-                                                    ConvertUtils.convert(nonEmptyMin, type.getJavaType()), true,
-                                                    ConvertUtils.convert(nonEmptyMax, type.getJavaType()), true)),
-                                            false));
+                                    Domain.create(ValueSet.ofRanges(range), false));
                         }
                     }
                 }

@@ -252,9 +252,14 @@ public class TileDBSplitManager
                     high += 1;
                     leftOvers--;
                 }
-                ranges.add(new Range(
-                        new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), low)), lowBound),
-                        new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), high)), upperBound)));
+
+                // Only set the range if the values are not equal or if the low
+                // and high are the bounds must also be the same
+                if (low != high || lowBound == upperBound) {
+                    ranges.add(new Range(
+                            new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), low)), lowBound),
+                            new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), high)), upperBound)));
+                }
                 // Set the low value to the high+1 for the next range split
                 low = high + 1;
             }
