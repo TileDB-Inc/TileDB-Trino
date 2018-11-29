@@ -52,6 +52,7 @@ import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_CU
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getEnableStats;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getReadBufferSize;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.tiledb.java.api.Constants.TILEDB_COORDS;
@@ -61,6 +62,8 @@ import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
 import static io.tiledb.java.api.QueryStatus.TILEDB_UNINITIALIZED;
 import static io.tiledb.java.api.Types.getJavaType;
 import static java.lang.Float.floatToRawIntBits;
+import static java.lang.Float.intBitsToFloat;
+import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -452,18 +455,35 @@ public class TileDBRecordCursor
         Object dimUpperBound = null;
 
         if (range.isSingleValue()) {
-            dimLowerBound = range.getSingleValue();
-            dimUpperBound = range.getSingleValue();
+            if (REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
+                Float val = intBitsToFloat(toIntExact((Long) range.getSingleValue()));
+                dimLowerBound = val;
+                dimUpperBound = val;
+            }
+            else {
+                dimLowerBound = ConvertUtils.convert(range.getSingleValue(), getJavaType(type));
+                dimUpperBound = dimLowerBound;
+            }
         }
         else {
             Marker lowerBound = range.getLow();
+
             if (!lowerBound.isLowerUnbounded()) {
+                Object lowerBoundValue = lowerBound.getValue();
+
+                if (REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
+                    lowerBoundValue = intBitsToFloat(toIntExact((Long) lowerBoundValue));
+                }
+                else {
+                    lowerBoundValue = ConvertUtils.convert(lowerBoundValue, getJavaType(type));
+                }
+
                 switch (lowerBound.getBound()) {
                     case ABOVE:
-                        dimLowerBound = addEpsilon(lowerBound.getValue(), type);
+                        dimLowerBound = addEpsilon(lowerBoundValue, type);
                         break;
                     case EXACTLY:
-                        dimLowerBound = lowerBound.getValue();
+                        dimLowerBound = lowerBoundValue;
                         break;
                     case BELOW:
                         throw new IllegalArgumentException("Low marker should never use BELOW bound");
@@ -473,15 +493,25 @@ public class TileDBRecordCursor
             }
 
             Marker upperBound = range.getHigh();
+
             if (!upperBound.isUpperUnbounded()) {
+                Object upperBoundValue = upperBound.getValue();
+
+                if (REAL.equals(upperBound.getType()) && upperBound.getType().getJavaType() == long.class) {
+                    upperBoundValue = intBitsToFloat(toIntExact((Long) upperBoundValue));
+                }
+                else {
+                    upperBoundValue = ConvertUtils.convert(upperBoundValue, getJavaType(type));
+                }
+
                 switch (upperBound.getBound()) {
                     case ABOVE:
                         throw new IllegalArgumentException("High marker should never use ABOVE bound");
                     case EXACTLY:
-                        dimUpperBound = upperBound.getValue();
+                        dimUpperBound = upperBoundValue;
                         break;
                     case BELOW:
-                        dimUpperBound = subtractEpsilon(upperBound.getValue(), type);
+                        dimUpperBound = subtractEpsilon(upperBoundValue, type);
                         break;
                     default:
                         throw new AssertionError("Unhandled bound: " + upperBound.getBound());
