@@ -4,11 +4,20 @@
 
 This connector allows running sql on TileDB arrays via Presto.
 
+TileDB is a library and format that efficiently manages large-scale,
+n-dimensional, dense and sparse array data. For more information about TileDB
+see the [official TileDB documentation](https://docs.tiledb.io/en/latest/introduction.html)
+
 ## Usage
 
 The TileDB presto connector supports most sql operations from prestodb. Arrays
 can be references dynamically and are not required to be "pre-registered"
-with presto. To query a tiledb array simply reference the URI in the from
+with presto. No external service, such as hive is required either.
+ 
+Predicates pushdown is supported for dimension fields.
+
+To query a tiledb array simply reference the URI in the from
+
 clause. i.e:
 
 ```
@@ -31,6 +40,9 @@ does not have a concept of a schema, so any valid string can be used for the
 schema name when querying. `tiledb` is used for convenience in the examples.
 `table_name` will be the array uri and can be local or remote (s3).
 
+For more examples see [docs/Examples.md](docs/Examples.md) .
+For connector specific sql see [docs/SQL.md](docs/SQL.md)
+
 ## Docker
 
 A quickstart docker image is available. The docker image will start a single
@@ -44,6 +56,23 @@ docker run -it --rm tiledb/presto-tiledb
 
 presto> show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global"
 ```
+
+### Mounting an Existing Local Array
+
+It is possible to mount a local array into the docker container to allow
+queries against it. You can use the `-v` option to mount a local path with
+docker.
+
+```
+docker run -it --rm -v /local/array/path:/data/local_array tiledb/presto-tiledb
+
+presto> show columns from tiledb.tiledb."file:///opt/local_array"
+```
+
+In the above example, replace `/local/array/path` with the path to the
+array folder on your local machine. The `/data/local_array` path is also
+arbitrary. Where ever you mount the folder inside the docker image is the
+path you will use to query the array. 
 
 ## Installation
 
@@ -83,46 +112,89 @@ Using amazon emr `target/presto-tiledb-$VERSION` needs to be copied to
 
 ### Configuration
 
-A single configuration file is needed. The config file should be located in
-the same cat
-Sample file contents:
-```
-connector.name=tiledb
-# Set read buffer to 10M per attribute
-read-buffer-size=10485760
-```
-
-#### Plugin Configuration Parameters
-
-The following parameters can be configured in the tiledb.properties and are
-plugin wide.
-
-| Name | Default | Data Type | Purpose |
-| ---- | ------- | --------- | ------- |
-| array-uris | "" | String (csv list) | List of arrays to preload metadata on |
-| read-buffer-size | 10485760 | Integer | Set the max read buffer size per attribute |
-| write-buffer-size | 10485760 | Integer | Set the max write buffer size per attribute |
-| aws-access-key-id | "" | String | AWS_ACCESS_KEY_ID for s3 access |
-| aws-secret-access-key | "" | String | AWS_SECRET_ACCESS_KEY for s3 access |
-
-
-#### Session Parameters
-
-The following session parameters can be set via `set session tiledb.X`.
-Session parameters which have a default of "plugin config setting" use
-the plugin configuration default for the equivalent setting.
-
-| Name | Default | Data Type | Purpose |
-| ---- | ------- | --------- | ------- |
-| read_buffer_size | plugin config setting | Integer | Set the max read buffer size per attribute |
-| write_buffer_size | plugin config setting  | Integer | Set the max write buffer size per attribute |
-| aws_access_key_id | plugin config setting  | String | AWS_ACCESS_KEY_ID for s3 access |
-| aws_secret_access_key | plugin config setting  | String | AWS_SECRET_ACCESS_KEY for s3 access |
-| splits | -1 | Integer | Set the number of splits to use per query, -1 means splits will be equal to number of workers |
-| split_only_predicates | false | Boolean | Split only based on predicates pushed down from where clause. For sparse array splitting evening across all domains can create skewed splits |
-| enable_stats | false | Boolean | Enable collecting and dumping of connector stats to log |
+See [docs/Configuration.md](docs/Configuration.md)
 
 ## Limitations
 
--   Create table is limited and does not support all tiledb array schema
-parameters
+See [docs/Limitations.md](docs/Limitations.md)
+
+## Mapping of An Array to Presto Table
+
+When a multi-dimensional is queried in presto, the dimension are converted
+to column for the result set. Attributes are also returned as columns.
+
+### Dense
+
+Consider the following example, a dense 2 dimensional arrays with dim1 and dim2
+as the dimensions and a single attribute a. The array looks like:
+
+```
++-------+-------+
+|   A   |   A   |
+|   1   |   2   |
+|       |       |
++---------------+
+|   A   |   A   |
+|   3   |   4   |
+|       |       |
++---------------+
+|   A   |   A   |
+|   5   |   6   |
+|       |       |
++---------------+
+|   A   |   A   |
+|   7   |   8   |
+|       |       |
++-------+-------+
+````
+
+When queried via Presto the results are mapped to a table in the form of:
+
+```
+ dim1 | dim2 | a
+------+------+---
+    1 |    1 | 1
+    1 |    2 | 2
+    2 |    1 | 3
+    2 |    2 | 4
+    3 |    1 | 5
+    3 |    2 | 6
+    4 |    1 | 7
+    4 |    2 | 8
+```
+
+### Sparse
+
+A sparse array is treated similar to dense. In this example the sparse array
+has two dimensions, dim1 and dim2 and a single attribute A. With a sparse
+array only the non-empty cells are returned.
+
+Array:
+```
++-------+-------+-------+-------+
+|   A   |       |       |       |
+|   1   |       |       |       |
+|       |       |       |       |
++-------------------------------+
+|       |       |   A   |   A   |
+|       |       |   3   |   2   |
+|       |       |       |       |
++-------------------------------+
+|       |       |       |       |
+|       |       |       |       |
+|       |       |       |       |
++-------------------------------+
+|       |       |       |       |
+|       |       |       |       |
+|       |       |       |       |
++-------+-------+-------+-------+
+```
+
+Presto table results:
+```
+ dim1 | dim2 | a
+------+------+---
+    1 |    1 | 1
+    2 |    4 | 2
+    2 |    3 | 3
+```
