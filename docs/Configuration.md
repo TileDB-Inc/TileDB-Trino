@@ -13,7 +13,7 @@ read-buffer-size=10485760
 ## Plugin Configuration Parameters
 
 The following parameters can be configured in the `tiledb.properties` and are
-plugin wide.
+plugin-wide.
 
 | Name | Default | Data Type | Purpose |
 | ---- | ------- | --------- | ------- |
