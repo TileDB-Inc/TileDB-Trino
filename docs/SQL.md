@@ -1,11 +1,10 @@
 # SQL
 
-This document contains all custom sql or sql options defined by the TileDB
-connector.
+This document contains all custom SQL options defined by the TileDB Presto connector.
 
 ## Create Table
 
-The following properties can be configured for creating TileDB array in
+The following properties can be configured for creating a TileDB array in
 Presto.
 
 ### Table properties

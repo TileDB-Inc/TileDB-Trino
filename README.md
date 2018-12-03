@@ -2,29 +2,57 @@
 
 [![Build Status](https://gitlab.com/TileDB-Inc/TileDB-Presto/badges/master/build.svg)](https://gitlab.com/TileDB-Inc/TileDB-Presto/pipelines)
 
-This connector allows running sql on TileDB arrays via Presto.
-
-TileDB is a library and format that efficiently manages large-scale,
-n-dimensional, dense and sparse array data. For more information about TileDB
+TileDB is an efficient library for managing large-scale,
+multi-dimensional dense and sparse array data introducing a novel array format. For more information about TileDB
 see the [official TileDB documentation](https://docs.tiledb.io/en/latest/introduction.html)
 
-## Usage
+This connector allows running SQL on TileDB arrays via Presto. In addition, this connector
+support predicate pushdown on dimension fields, leading to superb performance for
+range queries.
 
-The TileDB presto connector supports most sql operations from prestodb. Arrays
-can be references dynamically and are not required to be "pre-registered"
-with presto. No external service, such as hive is required either.
+
+## Quickstart
+
+## Docker
+
+A quickstart Docker image is available. The docker image will start a single-node 
+Presto cluster and open the CLI Presto interface where SQL can be run.
+The Docker image includes two example tiledb arrays
+`/opt/tiledb_example_arrays/dense_global` and `/opt/tiledb_example_arrays/sparse_global`. 
+Simply run:
+
+```
+docker run -it --rm tiledb/tiledb-presto
+```
+
+or mount a local array into the Docker container with the `-v` option: 
+
+```
+docker run -it --rm -v /local/array/path:/data/local_array tiledb/tiledb-presto
+```
+
+In the above example, replace `/local/array/path` with the path to the
+array folder on your local machine. The `/data/local_array` path is the 
+path you will use within the Docker image to access `/local/array/path`
+(you can replace it with another path of your choice). 
+
+The TileDB presto connector supports most SQL operations from PrestoDB. Arrays
+can be referenced dynamically and are not required to be "pre-registered"
+with Presto. *No external service* (such as [Apache Hive](https://hive.apache.org/)) 
+is required either.
  
-Predicates pushdown is supported for dimension fields.
-
-To query a tiledb array simply reference the URI in the from
-
-clause. i.e:
+Examples: 
 
 ```
-show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global"
+show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global;"
+Column |  Type   | Extra |  Comment  
+--------+---------+-------+-----------
+ rows   | integer |       | Dimension 
+ cols   | integer |       | Dimension 
+ a      | integer |       | Attribute 
+
 ```
 
-Example select:
 
 ```
 select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" WHERE rows = 3 AND cols between 1 and 2;
@@ -38,57 +66,27 @@ select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" WHE
 Presto uses the form of `catalog`.`schema`.`table_name` for querying. TileDB
 does not have a concept of a schema, so any valid string can be used for the 
 schema name when querying. `tiledb` is used for convenience in the examples.
-`table_name` will be the array uri and can be local or remote (s3).
+`table_name` will be the array URI and can be local or remote (AWS S3).
 
-For more examples see [docs/Examples.md](docs/Examples.md) .
-For connector specific sql see [docs/SQL.md](docs/SQL.md)
+For more examples see [docs/Examples.md](docs/Examples.md).
 
-## Docker
-
-A quickstart docker image is available. The docker image will start a single
-node presto cluster and open the cli presto interface where sql can be run.
-The docker images includes two example tiledb arrays
-`/opt/tiledb_example_arrays/dense_global` and
-`/opt/tiledb_example_arrays/sparse_global` .
-
-```
-docker run -it --rm tiledb/presto-tiledb
-
-presto> show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global"
-```
-
-### Mounting an Existing Local Array
-
-It is possible to mount a local array into the docker container to allow
-queries against it. You can use the `-v` option to mount a local path with
-docker.
-
-```
-docker run -it --rm -v /local/array/path:/data/local_array tiledb/presto-tiledb
-
-presto> show columns from tiledb.tiledb."file:///opt/local_array"
-```
-
-In the above example, replace `/local/array/path` with the path to the
-array folder on your local machine. The `/data/local_array` path is also
-arbitrary. Where ever you mount the folder inside the docker image is the
-path you will use to query the array. 
+For custom connector SQL options see [docs/SQL.md](docs/SQL.md).
 
 ## Installation
 
 Currently this connector is built as a plugin. It must be packaged and
-installed on the presto instances.
+installed on the PrestoDB instances.
 
 ### Latest Release
 
 Download the [latest release](https://github.com/TileDB-Inc/presto-tiledb/releases/latest)
 and skip to the section
-[Installation on existing Presto instance](#Installation-on-existing-Presto-instance)
+[Installation on existing Presto instance](#Installation-on-existing-Presto-instance).
 
 ### Building Connector From Source
 
-The tiledb connector can be built using the following command from the
-top level directory of the presto source.
+The TileDB connector can be built using the following command from the
+top level directory of the Presto source.
 ```
 ./mvnw package
 ```
@@ -99,56 +97,56 @@ Tests can be skipped by adding `-DskipTests`
 ./mvnw package -DskipTests
 ```
 
-### Installation on existing Presto instance
+### Installation on an existing Presto instance
 
-If you are installing the plugin on an existing presto, such as amazon
+If you are installing the plugin on an existing Presto instance, such as Amazon
 EMR, then you need to copy the `target/presto-tiledb-$VERSION` folder
 to a `tiledb` directory under the plugin directory on echo presto node.
 
-#### EMR Instruction
+#### AWS EMR 
 
-Using amazon emr `target/presto-tiledb-$VERSION` needs to be copied to
+Using Amazon EMR `target/presto-tiledb-$VERSION` needs to be copied to
 `/usr/lib/presto/plugin/tiledb/`
 
 ### Configuration
 
-See [docs/Configuration.md](docs/Configuration.md)
+See [docs/Configuration.md](docs/Configuration.md).
 
 ## Limitations
 
-See [docs/Limitations.md](docs/Limitations.md)
+See [docs/Limitations.md](docs/Limitations.md).
 
-## Mapping of An Array to Presto Table
+## Arrays as SQL Tables
 
-When a multi-dimensional is queried in presto, the dimension are converted
-to column for the result set. Attributes are also returned as columns.
+When a multi-dimensional is queried in Presto, the dimensions are converted
+to table columns for the result set. Attributes are also returned as columns.
 
-### Dense
+### Dense Arrays
 
-Consider the following example, a dense 2 dimensional arrays with dim1 and dim2
-as the dimensions and a single attribute a. The array looks like:
+Consider the following example 2D `4x2` dense array with `dim1` and `dim2`
+as the dimensions and a single attribute `a`:
 
 ```
 +-------+-------+
-|   A   |   A   |
-|   1   |   2   |
+|       |       |
+|  a:1  |  a:2  |
 |       |       |
 +---------------+
-|   A   |   A   |
-|   3   |   4   |
+|       |       |
+|  a:3  |  a:4  |
 |       |       |
 +---------------+
-|   A   |   A   |
-|   5   |   6   |
+|       |       |
+|  a:5  |  a:6  |
 |       |       |
 +---------------+
-|   A   |   A   |
-|   7   |   8   |
+|       |       |
+|  a:7  |  a:8  |
 |       |       |
 +-------+-------+
 ````
 
-When queried via Presto the results are mapped to a table in the form of:
+When queried via Presto the results are mapped to the following table:
 
 ```
  dim1 | dim2 | a
@@ -163,21 +161,20 @@ When queried via Presto the results are mapped to a table in the form of:
     4 |    2 | 8
 ```
 
-### Sparse
+### Sparse Arrays
 
-A sparse array is treated similar to dense. In this example the sparse array
-has two dimensions, dim1 and dim2 and a single attribute A. With a sparse
-array only the non-empty cells are returned.
+A sparse array is treated similar to a dense. The following example
+depicts a 2D `4x4` sparse array with dimensions `dim1`, `dim2` and
+a single attribute `a`. Notice that this array has empty cells. 
 
-Array:
 ```
 +-------+-------+-------+-------+
-|   A   |       |       |       |
-|   1   |       |       |       |
+|       |       |       |       |
+|  a:1  |       |       |       |
 |       |       |       |       |
 +-------------------------------+
-|       |       |   A   |   A   |
-|       |       |   3   |   2   |
+|       |       |       |       |
+|       |       |  a:3  |  a:2  |
 |       |       |       |       |
 +-------------------------------+
 |       |       |       |       |
@@ -190,7 +187,9 @@ Array:
 +-------+-------+-------+-------+
 ```
 
-Presto table results:
+For sparse arrays only the non-empty cells are materialized and returned.
+The above array is modeled in Presto as a table of the form:
+
 ```
  dim1 | dim2 | a
 ------+------+---
