@@ -67,6 +67,24 @@ does not have a concept of a schema, so any valid string can be used for the
 schema name when querying. `tiledb` is used for convenience in the examples.
 `table_name` is the array URI and can be local (file://) or remote (s3://).
 
+### Running SQL from a File or Command Line Argument
+
+It is possible to specify a file that contains sql to be run from the docker
+image:
+
+```
+echo 'select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" limit 10;' > example.sql
+docker run -it --rm -v ${PWD}/example.sql:/tmp/example.sql tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --file /tmp/example.sql
+```
+
+You can also run a sql statement directly:
+
+```
+docker run -it --rm tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --execute 'select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" limit 10;'
+```
+
+
+
 For more examples see [docs/Examples.md](docs/Examples.md).
 
 For custom connector SQL options see [docs/SQL.md](docs/SQL.md).
