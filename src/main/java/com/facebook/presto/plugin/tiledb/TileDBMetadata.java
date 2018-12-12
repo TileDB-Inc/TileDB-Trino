@@ -146,7 +146,7 @@ public class TileDBMetadata
         Map<ColumnHandle, Domain> enforceableDimensionDomains = new HashMap<>(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.in(dimensionHandles)));
 
         if (!getSplitOnlyPredicates(session)) {
-            try (Array array = new Array(tileDBClient.getCtx(), tableHandle.getURI().toString(), TILEDB_READ)) {
+            try (Array array = new Array(tileDBClient.buildContext(session), tableHandle.getURI().toString(), TILEDB_READ)) {
                 HashMap<String, Pair> nonEmptyDomain = array.nonEmptyDomain();
                 // Find any dimension which do not have predicates and add one for the entire domain.
                 // This is required so we can later split on the predicates
