@@ -60,7 +60,7 @@ public class TileDBRecordSet
         TileDBTable table = tileDBClient.getTable(session, split.getSchemaName(), split.getTableName());
         requireNonNull(table, "Unable to fetch table " + split.getSchemaName() + "." + split.getTableName() + " for record set");
         try {
-            array = new Array(tileDBClient.getCtx(), table.getURI().toString(), TILEDB_READ);
+            array = new Array(tileDBClient.buildContext(session), table.getURI().toString(), TILEDB_READ);
             query = new Query(array, TILEDB_READ);
             query.setLayout(Layout.TILEDB_GLOBAL_ORDER);
         }

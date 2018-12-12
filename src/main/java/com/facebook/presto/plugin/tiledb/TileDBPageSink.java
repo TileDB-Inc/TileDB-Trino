@@ -99,11 +99,12 @@ public class TileDBPageSink
     public TileDBPageSink(TileDBOutputTableHandle handle, TileDBClient tileDBClient, ConnectorSession session)
     {
         try {
+            ctx = tileDBClient.buildContext(session);
             // Set max write buffer size from session configuration parameter
             this.maxBufferSize = getWriteBufferSize(session);
 
             // Open the array in write mode
-            array = new Array(tileDBClient.getCtx(), handle.getURI(), QueryType.TILEDB_WRITE);
+            array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE);
             // Create query object
             query = new Query(array, QueryType.TILEDB_WRITE);
             // All writes are unordered
@@ -131,7 +132,6 @@ public class TileDBPageSink
         for (int i = 0; i < columnNames.size(); i++) {
             columnOrder.put(columnNames.get(i), i);
         }
-        ctx = tileDBClient.getCtx();
     }
 
     /**
