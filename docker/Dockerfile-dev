@@ -3,6 +3,7 @@ MAINTAINER help@tiledb.io
 
 ENV PRESTO_VERSION=0.211
 ENV PRESTO_HOME=/opt/presto
+ENV PRESTO_CONF_DIR=${PRESTO_HOME}/etc
 
 # Add less for pagenation
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -51,6 +52,8 @@ COPY docker/etc ${PRESTO_HOME}/etc
 
 # Expose port for presto ui
 EXPOSE 8080
+
+ENV PATH=${PATH}:"${PRESTO_HOME}/bin"
 
 # Volumes for config and data (used for stats)
 VOLUME ["${PRESTO_HOME}/etc", "${PRESTO_HOME}/data"]
