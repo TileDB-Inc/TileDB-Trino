@@ -43,7 +43,7 @@ is required.
 Examples: 
 
 ```
-show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global;"
+show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global";
 Column |  Type   | Extra |  Comment  
 --------+---------+-------+-----------
  rows   | integer |       | Dimension 
