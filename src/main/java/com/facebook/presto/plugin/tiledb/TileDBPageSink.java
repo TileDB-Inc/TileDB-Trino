@@ -43,6 +43,7 @@ import org.joda.time.format.ISODateTimeFormat;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +90,8 @@ public class TileDBPageSink
     private final Map<String, Integer> dimensionOrder;
     private final TileDBOutputTableHandle table;
     private final int maxBufferSize; // Max Buffer
+    // This contains the list of attributes based on column order. The pair is (getType(), isVar())
+    private final List<Pair<Datatype, Boolean>>  attributeDetails;
 
     /**
      * Initialize an instance of page sink preparing for inserts
@@ -110,13 +113,30 @@ public class TileDBPageSink
             // All writes are unordered
             query.setLayout(Layout.TILEDB_UNORDERED);
 
+            columnTypes = handle.getColumnTypes();
+            columnNames = handle.getColumnNames();
+            columnOrder = new HashMap<>();
+            for (int i = 0; i < columnNames.size(); i++) {
+                columnOrder.put(columnNames.get(i), i);
+            }
+
+            attributeDetails = new ArrayList<>(Collections.nCopies(columnNames.size(), null));
+
             // For coordinates we need to have dimensions in their proper order, here we will get the ordering
             dimensionOrder = new HashMap<>();
             int i = 0;
             try (ArraySchema arraySchema = array.getSchema(); Domain domain = arraySchema.getDomain()) {
                 for (Dimension dimension : domain.getDimensions()) {
-                    dimensionOrder.put(dimension.getName(), i++);
+                    dimensionOrder.put(dimension.getName().toLowerCase(), i++);
                     dimension.close();
+                }
+            }
+
+            try (ArraySchema arraySchema = array.getSchema()) {
+                Map<String, Attribute> attributes = arraySchema.getAttributes();
+                for (Map.Entry<String, Attribute> attributeSet : attributes.entrySet()) {
+                    Attribute attribute = attributeSet.getValue();
+                    attributeDetails.set(columnOrder.get(attributeSet.getKey().toLowerCase()), new Pair<>(attribute.getType(), attribute.isVar()));
                 }
             }
 
@@ -124,13 +144,6 @@ public class TileDBPageSink
         }
         catch (TileDBError tileDBError) {
             throw new PrestoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
-        }
-
-        columnTypes = handle.getColumnTypes();
-        columnNames = handle.getColumnNames();
-        columnOrder = new HashMap<>();
-        for (int i = 0; i < columnNames.size(); i++) {
-            columnOrder.put(columnNames.get(i), i);
         }
     }
 
@@ -167,16 +180,14 @@ public class TileDBPageSink
 
             // If column is not a dimension check to see if its an attribute
             if (!isDimension) {
-                try (ArraySchema arraySchema = array.getSchema(); Attribute attribute = arraySchema.getAttribute(columnNames.get(channel))) {
-                    type = attribute.getType();
-                    isVariableLength = attribute.isVar();
-                    // If the attribute is variable length create offset and values arrays
-                    values = new NativeArray(ctx, maxBufferSize, type);
-                    if (isVariableLength) {
-                        offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
-                    }
-                    buffers.put(columnName, new Pair<>(offsets, values));
+                type = attributeDetails.get(channel).getFirst();
+                isVariableLength = attributeDetails.get(channel).getSecond();
+                // If the attribute is variable length create offset and values arrays
+                values = new NativeArray(ctx, maxBufferSize, type);
+                if (isVariableLength) {
+                    offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
                 }
+                buffers.put(columnName, new Pair<>(offsets, values));
             }
         }
         // Get list of dimensions
@@ -220,15 +231,14 @@ public class TileDBPageSink
                         int bufferPosition = toIntExact(bufferEffectiveSize);
                         // If we have a dimension we need to set the position for the coordinate buffer based on dimension ordering
                         Pair<NativeArray, NativeArray> bufferPair = buffers.get(columnName);
-                        try (ArraySchema arraySchema = array.getSchema(); Attribute attribute = arraySchema.getAttribute(columnNames.get(channel))) {
-                            // For variable length attributes we always start the position at the current max size.
-                            if (attribute.isVar()) {
-                                bufferPair.getFirst().setItem(position, bufferEffectiveSize);
-                            }
-                            // Add this value to the array
-                            Long newBufferEffectiveSize = appendColumn(page, position, channel, bufferPair.getSecond(), bufferPosition);
-                            bufferEffectiveSizes.put(columnName, newBufferEffectiveSize);
+
+                        // For variable length attributes we always start the position at the current max size.
+                        if (attributeDetails.get(channel).getSecond()) {
+                            bufferPair.getFirst().setItem(position, bufferEffectiveSize);
                         }
+                        // Add this value to the array
+                        Long newBufferEffectiveSize = appendColumn(page, position, channel, bufferPair.getSecond(), bufferPosition);
+                        bufferEffectiveSizes.put(columnName, newBufferEffectiveSize);
                     }
 
                     // Add dimension in proper order to coordinates
