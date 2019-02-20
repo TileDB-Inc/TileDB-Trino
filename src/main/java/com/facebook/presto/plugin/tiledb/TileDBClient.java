@@ -245,8 +245,12 @@ public class TileDBClient
         try {
             Context localCtx = buildContext(session);
 
-            // Get URI from table properties
-            String uri = (String) tableMetadata.getProperties().get(TileDBTableProperties.URI);
+            String uri = table;
+            if (tableMetadata.getProperties().containsKey(TileDBTableProperties.URI)) {
+                // Get URI from table properties
+                uri = (String) tableMetadata.getProperties().get(TileDBTableProperties.URI);
+            }
+
             ArrayType arrayType;
             // Get array type from table properties
             String arrayTypeStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.ArrayType)).toUpperCase();
