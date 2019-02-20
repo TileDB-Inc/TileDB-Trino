@@ -65,7 +65,7 @@ public class TileDBTable
         for (Dimension dimension : domain.getDimensions()) {
             Type type = prestoTypeFromTileDBType(dimension.getType());
             columnsMetadata.add(new ColumnMetadata(dimension.getName(), type, "Dimension", null, false));
-            columns.add(new TileDBColumn(dimension.getName(), type, true));
+            columns.add(new TileDBColumn(dimension.getName(), type, dimension.getType(), false, true));
             dimension.close();
         }
         // Add attribute as a column
@@ -76,7 +76,7 @@ public class TileDBTable
                 type = VarcharType.createVarcharType(toIntExact(attribute.getCellValNum()));
             }
             columnsMetadata.add(new ColumnMetadata(attribute.getName(), type, "Attribute", null, false));
-            columns.add(new TileDBColumn(attribute.getName(), type, false));
+            columns.add(new TileDBColumn(attribute.getName(), type, attribute.getType(), attribute.isVar(), false));
             attribute.close();
         }
         domain.close();

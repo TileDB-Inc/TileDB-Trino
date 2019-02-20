@@ -69,22 +69,6 @@ public class TileDBRecordSet
         }
     }
 
-   /* private Query buildSubArray(Query query, List<TileDBColumnHandle> columnHandles, TupleDomain<ColumnHandle> tupleDomain) {
-        // Loop through columns to find attributes.
-        // We need find the dimension limitations so we can build the subarray
-        for (TileDBColumnHandle column : columnHandles) {
-            if(column.getIsDimension()) {
-                Domain domain = tupleDomain.getDomains().get().get(column);
-                if (domain != null) {
-                    for (Range range : domain.getValues().getRanges().getOrderedRanges()) {
-                        //range.getHigh()
-                    }
-                }
-            }
-        }
-        return query;
-    }*/
-
     @Override
     public List<Type> getColumnTypes()
     {

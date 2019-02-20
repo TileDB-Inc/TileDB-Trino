@@ -16,6 +16,7 @@ package com.facebook.presto.plugin.tiledb;
 import com.facebook.presto.spi.type.Type;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.tiledb.java.api.Datatype;
 
 import java.util.Objects;
 
@@ -35,17 +36,23 @@ public final class TileDBColumn
 {
     private final String name;
     private final Type type;
+    private final Datatype tileDBType;
+    private final Boolean isVariableLength;
     private final Boolean isDimension;
 
     @JsonCreator
     public TileDBColumn(
             @JsonProperty("name") String name,
             @JsonProperty("type") Type type,
+            @JsonProperty("TileDBType") Datatype tileDBType,
+            @JsonProperty("isVariableLength") Boolean isVariableLength,
             @JsonProperty("isDimension") Boolean isDimension)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or is empty");
         this.name = name;
         this.type = requireNonNull(type, "type is null");
+        this.tileDBType = requireNonNull(tileDBType, "TileDBType is null");
+        this.isVariableLength = requireNonNull(isVariableLength, "isVariableLength is null");
         this.isDimension = requireNonNull(isDimension, "isDimension is null");
     }
 
@@ -53,6 +60,18 @@ public final class TileDBColumn
     public String getName()
     {
         return name;
+    }
+
+    @JsonProperty
+    public Datatype getTileDBType()
+    {
+        return tileDBType;
+    }
+
+    @JsonProperty
+    public Boolean getIsVariableLength()
+    {
+        return isVariableLength;
     }
 
     @JsonProperty

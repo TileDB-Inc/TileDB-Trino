@@ -26,7 +26,6 @@ import com.google.common.primitives.SignedBytes;
 import io.airlift.slice.Slice;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
-import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.Dimension;
@@ -48,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_PAGE_SINK_ERROR;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
@@ -80,8 +80,7 @@ public class TileDBPageSink
     private final Array array;
     private final Context ctx;
 
-    private final List<Type> columnTypes;
-    private final List<String> columnNames;
+    private final List<TileDBColumnHandle> columnHandles;
     // ColumnOrder holds the `channel` number for a column
     // This is used specifically for fetching and storing dimensions in proper order for tiledb coordinates
     private final Map<String, Integer> columnOrder;
@@ -126,11 +125,10 @@ public class TileDBPageSink
             throw new PrestoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
         }
 
-        columnTypes = handle.getColumnTypes();
-        columnNames = handle.getColumnNames();
+        columnHandles = handle.getColumnHandles();
         columnOrder = new HashMap<>();
-        for (int i = 0; i < columnNames.size(); i++) {
-            columnOrder.put(columnNames.get(i), i);
+        for (int i = 0; i < columnHandles.size(); i++) {
+            columnOrder.put(columnHandles.get(i).getColumnName(), i);
         }
     }
 
@@ -155,28 +153,27 @@ public class TileDBPageSink
         query.resetBuffers();
 
         // Loop through each column
-        for (int channel = 0; channel < columnNames.size(); channel++) {
+        for (int channel = 0; channel < columnHandles.size(); channel++) {
             // Datatype
             Datatype type = null;
             // Is column of variable length
             boolean isVariableLength = false;
-            String columnName = columnNames.get(channel);
+            TileDBColumnHandle columnHandle = columnHandles.get(channel);
+            String columnName = columnHandle.getColumnName();
             boolean isDimension = dimensionOrder.containsKey(columnName);
             NativeArray values = null;
             NativeArray offsets = null;
 
             // If column is not a dimension check to see if its an attribute
             if (!isDimension) {
-                try (ArraySchema arraySchema = array.getSchema(); Attribute attribute = arraySchema.getAttribute(columnNames.get(channel))) {
-                    type = attribute.getType();
-                    isVariableLength = attribute.isVar();
-                    // If the attribute is variable length create offset and values arrays
-                    values = new NativeArray(ctx, maxBufferSize, type);
-                    if (isVariableLength) {
-                        offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
-                    }
-                    buffers.put(columnName, new Pair<>(offsets, values));
+                type = columnHandle.getColumnTileDBType();
+                isVariableLength = columnHandle.getIsVariableLength();
+                // If the attribute is variable length create offset and values arrays
+                values = new NativeArray(ctx, maxBufferSize, type);
+                if (isVariableLength) {
+                    offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
                 }
+                buffers.put(columnName, new Pair<>(offsets, values));
             }
         }
         // Get list of dimensions
@@ -210,7 +207,8 @@ public class TileDBPageSink
                 Map<String, Long> previousBufferEffectiveSizes = bufferEffectiveSizes;
                 try {
                     for (int channel = 0; channel < page.getChannelCount(); channel++) {
-                        String columnName = columnNames.get(channel);
+                        TileDBColumnHandle columnHandle = columnHandles.get(channel);
+                        String columnName = columnHandle.getColumnName();
                         // If the current column is a dimension we will skip, as all dimensions are handled at the end of the row
                         if (dimensionOrder.containsKey(columnName)) {
                             continue;
@@ -220,15 +218,13 @@ public class TileDBPageSink
                         int bufferPosition = toIntExact(bufferEffectiveSize);
                         // If we have a dimension we need to set the position for the coordinate buffer based on dimension ordering
                         Pair<NativeArray, NativeArray> bufferPair = buffers.get(columnName);
-                        try (ArraySchema arraySchema = array.getSchema(); Attribute attribute = arraySchema.getAttribute(columnNames.get(channel))) {
-                            // For variable length attributes we always start the position at the current max size.
-                            if (attribute.isVar()) {
-                                bufferPair.getFirst().setItem(position, bufferEffectiveSize);
-                            }
-                            // Add this value to the array
-                            Long newBufferEffectiveSize = appendColumn(page, position, channel, bufferPair.getSecond(), bufferPosition);
-                            bufferEffectiveSizes.put(columnName, newBufferEffectiveSize);
+                        // For variable length attributes we always start the position at the current max size.
+                        if (columnHandle.getIsVariableLength()) {
+                            bufferPair.getFirst().setItem(position, bufferEffectiveSize);
                         }
+                        // Add this value to the array
+                        Long newBufferEffectiveSize = appendColumn(page, position, channel, bufferPair.getSecond(), bufferPosition);
+                        bufferEffectiveSizes.put(columnName, newBufferEffectiveSize);
                     }
 
                     // Add dimension in proper order to coordinates
@@ -281,7 +277,7 @@ public class TileDBPageSink
      */
     private void initBufferEffectiveSizes(Map<String, Long> bufferEffectiveSizes)
     {
-        for (String columnName : columnNames) {
+        for (String columnName : columnHandles.stream().map(TileDBColumnHandle::getColumnName).collect(Collectors.toList())) {
             if (!dimensionOrder.containsKey(columnName)) {
                 bufferEffectiveSizes.put(columnName, 0L);
             }
@@ -363,11 +359,11 @@ public class TileDBPageSink
     {
         Block block = page.getBlock(channel);
         if (block.isNull(position)) {
-            throw new TileDBError("Null values not allowed for insert. Error in table " + table.getTableName() + ", column " + columnNames.get(channel) + ", row " + position);
+            throw new TileDBError("Null values not allowed for insert. Error in table " + table.getTableName() + ", column " + columnHandles.get(channel).getColumnName() + ", row " + position);
         }
 
         int size = 1;
-        Type type = columnTypes.get(channel);
+        Type type = columnHandles.get(channel).getColumnType();
 
         // Only varchar and varbinary are supported for variable length attributes, so we only check these for additional size requirements
         if (isVarcharType(type) || isCharType(type)) {

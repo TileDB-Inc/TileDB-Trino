@@ -15,17 +15,14 @@ package com.facebook.presto.plugin.tiledb;
 
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
 import com.facebook.presto.spi.ConnectorOutputTableHandle;
-import com.facebook.presto.spi.type.Type;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nullable;
 
 import java.util.List;
 import java.util.Objects;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class TileDBOutputTableHandle
@@ -35,9 +32,8 @@ public class TileDBOutputTableHandle
     private final String catalogName;
     private final String schemaName;
     private final String tableName;
-    private final List<String> columnNames;
-    private final List<Type> columnTypes;
     private final String uri;
+    private final List<TileDBColumnHandle> columnHandles;
 
     @JsonCreator
     public TileDBOutputTableHandle(
@@ -45,8 +41,7 @@ public class TileDBOutputTableHandle
             @JsonProperty("catalogName") @Nullable String catalogName,
             @JsonProperty("schemaName") @Nullable String schemaName,
             @JsonProperty("tableName") String tableName,
-            @JsonProperty("columnNames") List<String> columnNames,
-            @JsonProperty("columnTypes") List<Type> columnTypes,
+            @JsonProperty("columnHandles") List<TileDBColumnHandle> columnHandles,
             @JsonProperty("uri") String uri)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
@@ -54,11 +49,7 @@ public class TileDBOutputTableHandle
         this.schemaName = schemaName;
         this.tableName = requireNonNull(tableName, "tableName is null");
 
-        requireNonNull(columnNames, "columnNames is null");
-        requireNonNull(columnTypes, "columnTypes is null");
-        checkArgument(columnNames.size() == columnTypes.size(), "columnNames and columnTypes sizes don't match");
-        this.columnNames = ImmutableList.copyOf(columnNames);
-        this.columnTypes = ImmutableList.copyOf(columnTypes);
+        this.columnHandles = requireNonNull(columnHandles, "columnHandles is null");
         this.uri = requireNonNull(uri, "uri is null");
     }
 
@@ -89,15 +80,9 @@ public class TileDBOutputTableHandle
     }
 
     @JsonProperty
-    public List<String> getColumnNames()
+    public List<TileDBColumnHandle> getColumnHandles()
     {
-        return columnNames;
-    }
-
-    @JsonProperty
-    public List<Type> getColumnTypes()
-    {
-        return columnTypes;
+        return columnHandles;
     }
 
     @JsonProperty
@@ -120,8 +105,7 @@ public class TileDBOutputTableHandle
                 catalogName,
                 schemaName,
                 tableName,
-                columnNames,
-                columnTypes,
+                columnHandles,
                 uri);
     }
 

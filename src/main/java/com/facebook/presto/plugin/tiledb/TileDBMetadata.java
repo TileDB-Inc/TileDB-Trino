@@ -38,6 +38,7 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
 import com.facebook.presto.spi.statistics.ComputedStatistics;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -45,29 +46,52 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import io.airlift.slice.Slice;
 import io.tiledb.java.api.Array;
+import io.tiledb.java.api.ArraySchema;
+import io.tiledb.java.api.ArrayType;
+import io.tiledb.java.api.Attribute;
+import io.tiledb.java.api.Context;
+import io.tiledb.java.api.Datatype;
+import io.tiledb.java.api.Dimension;
+import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.TileDBError;
 import org.apache.commons.beanutils.ConvertUtils;
 
 import javax.inject.Inject;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getDimension;
+import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getExtent;
+import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getLowerBound;
+import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getUpperBound;
+import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
+import static com.facebook.presto.plugin.tiledb.TileDBModule.tileDBTypeFromPrestoType;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
+import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.Varchars.isVarcharType;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
+import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
+import static io.tiledb.java.api.Constants.TILEDB_VAR_NUM;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
+import static io.tiledb.java.api.Types.getJavaType;
 import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
@@ -255,7 +279,7 @@ public class TileDBMetadata
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
         for (TileDBColumn column : table.getColumns()) {
             // Create column handles, extra info contains a boolean for if its a dimension (true) or attribute (false)
-            columnHandles.put(column.getName(), new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getIsDimension()));
+            columnHandles.put(column.getName(), new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getTileDBType(), column.getIsVariableLength(), column.getIsDimension()));
         }
         return columnHandles.build();
     }
@@ -308,7 +332,7 @@ public class TileDBMetadata
     @Override
     public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
     {
-        tileDBClient.beginCreateTable(session, tableMetadata);
+        beginCreateArray(session, tableMetadata);
     }
 
     /**
@@ -321,7 +345,7 @@ public class TileDBMetadata
     @Override
     public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
-        TileDBOutputTableHandle handle = tileDBClient.beginCreateTable(session, tableMetadata);
+        TileDBOutputTableHandle handle = beginCreateArray(session, tableMetadata);
         setRollback(() -> tileDBClient.rollbackCreateTable(handle));
         return handle;
     }
@@ -396,9 +420,17 @@ public class TileDBMetadata
 
         ImmutableList.Builder<String> columnNames = ImmutableList.builder();
         ImmutableList.Builder<Type> columnTypes = ImmutableList.builder();
-        for (ColumnMetadata column : tableMetadata.getColumns()) {
-            columnNames.add(column.getName());
-            columnTypes.add(column.getType());
+
+        // Loop through all columns and build list of column handles in the proper ordering. Order is important here
+        // because we will use the list to avoid hashmap lookups for better performance.
+        List<ColumnMetadata> columnMetadata = tableMetadata.getColumns();
+        List<TileDBColumnHandle> columnHandles = new ArrayList<>(Collections.nCopies(columnMetadata.size(), null));
+        for (Map.Entry<String, ColumnHandle> columnHandleSet : getColumnHandles(session, tableHandle).entrySet()) {
+            for (int i = 0; i < columnMetadata.size(); i++) {
+                if (columnHandleSet.getKey().toLowerCase(Locale.ENGLISH).equals(columnMetadata.get(i).getName())) {
+                    columnHandles.set(i, (TileDBColumnHandle) columnHandleSet.getValue());
+                }
+            }
         }
 
         return new TileDBOutputTableHandle(
@@ -406,8 +438,7 @@ public class TileDBMetadata
                 "tiledb",
                 schema,
                 table,
-                columnNames.build(),
-                columnTypes.build(),
+                columnHandles,
                 uri);
     }
 
@@ -416,4 +447,243 @@ public class TileDBMetadata
     {
         return Optional.empty();
     }
-}
+
+    /**
+     * Create a array given a presto table layout/schema
+     * @param tableMetadata metadata about table
+     * @return Output table handler
+     */
+    public TileDBOutputTableHandle beginCreateArray(ConnectorSession session, ConnectorTableMetadata tableMetadata)
+    {
+        // Get schema/table names
+        SchemaTableName schemaTableName = tableMetadata.getTable();
+        String schema = schemaTableName.getSchemaName();
+        String table = schemaTableName.getTableName();
+
+        try {
+            Context localCtx = tileDBClient.buildContext(session);
+
+            // Get URI from table properties
+            String uri = (String) tableMetadata.getProperties().get(TileDBTableProperties.URI);
+            ArrayType arrayType;
+            // Get array type from table properties
+            String arrayTypeStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.ArrayType)).toUpperCase();
+
+            // Set array type based on string value
+            if (arrayTypeStr.equals("DENSE")) {
+                arrayType = TILEDB_DENSE;
+            }
+            else if (arrayTypeStr.equals("SPARSE")) {
+                arrayType = TILEDB_SPARSE;
+            }
+            else {
+                throw new TileDBError("Invalid array type set, must be one of [DENSE, SPARSE]");
+            }
+
+            // Create array schema
+            ArraySchema arraySchema = new ArraySchema(localCtx, arrayType);
+            io.tiledb.java.api.Domain domain = new io.tiledb.java.api.Domain(localCtx);
+
+            // If we have a sparse array we need to set capacity
+            if (arrayType == TILEDB_SPARSE) {
+                arraySchema.setCapacity((long) tableMetadata.getProperties().get(TileDBTableProperties.Capacity));
+            }
+
+            List<String> columnNames = new ArrayList<>();
+            // Loop through each column
+            for (ColumnMetadata column : tableMetadata.getColumns()) {
+                String columnName = column.getName();
+                Map<String, Object> columnProperties = column.getProperties();
+
+                // Get column type, convert to type types
+                Datatype type = tileDBTypeFromPrestoType(column.getType());
+                Class classType = getJavaType(type);
+                // Check if dimension or attribute
+                if (getDimension(columnProperties)) {
+                    Long lowerBound = getLowerBound(columnProperties);
+                    Long upperBound = getUpperBound(columnProperties);
+                    Long extent = getExtent(columnProperties);
+                    // Switch on dimension type to convert the Long value to appropriate type
+                    // If the value given by the user is too larger we set it to the max - 1
+                    // for the datatype. Eventually we will error to the user with verbose details
+                    // instead of altering the values
+                    switch (type) {
+                        case TILEDB_INT8:
+                            if (upperBound > Byte.MAX_VALUE) {
+                                upperBound = (long) Byte.MAX_VALUE - 1;
+                            }
+                            else if (upperBound < Byte.MIN_VALUE) {
+                                upperBound = (long) Byte.MIN_VALUE + 1;
+                            }
+                            if (lowerBound > Byte.MAX_VALUE) {
+                                lowerBound = (long) Byte.MAX_VALUE - 1;
+                            }
+                            else if (lowerBound < Byte.MIN_VALUE) {
+                                lowerBound = (long) Byte.MIN_VALUE;
+                            }
+                            if (extent > Byte.MAX_VALUE) {
+                                extent = (long) Byte.MAX_VALUE;
+                            }
+                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.byteValue(), upperBound.byteValue()), extent.byteValue()));
+                            break;
+                        case TILEDB_INT16:
+                            if (upperBound > Short.MAX_VALUE) {
+                                upperBound = (long) Short.MAX_VALUE - 1;
+                            }
+                            else if (upperBound < Short.MIN_VALUE) {
+                                upperBound = (long) Short.MIN_VALUE + 1;
+                            }
+                            if (lowerBound > Short.MAX_VALUE) {
+                                lowerBound = (long) Short.MAX_VALUE - 1;
+                            }
+                            else if (lowerBound < Short.MIN_VALUE) {
+                                lowerBound = (long) Short.MIN_VALUE;
+                            }
+                            if (extent > Short.MAX_VALUE) {
+                                extent = (long) Short.MAX_VALUE;
+                            }
+                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.shortValue(), upperBound.shortValue()), extent.shortValue()));
+                            break;
+                        case TILEDB_INT32:
+                            if (upperBound > Integer.MAX_VALUE) {
+                                upperBound = (long) Integer.MAX_VALUE - 1;
+                            }
+                            else if (upperBound < Integer.MIN_VALUE) {
+                                upperBound = (long) Integer.MIN_VALUE + 1;
+                            }
+                            if (lowerBound > Integer.MAX_VALUE) {
+                                lowerBound = (long) Integer.MAX_VALUE - 1;
+                            }
+                            else if (lowerBound < Integer.MIN_VALUE) {
+                                lowerBound = (long) Integer.MIN_VALUE;
+                            }
+
+                            if (extent > Integer.MAX_VALUE) {
+                                extent = (long) Integer.MAX_VALUE;
+                            }
+                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.intValue(), upperBound.intValue()), extent.intValue()));
+                            break;
+                        case TILEDB_INT64:
+                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound, upperBound), extent));
+                            break;
+                        case TILEDB_FLOAT32:
+                            if (upperBound > Float.MAX_VALUE) {
+                                upperBound = (long) Float.MAX_VALUE - 1;
+                            }
+                            else if (upperBound < Float.MIN_VALUE) {
+                                upperBound = (long) Float.MIN_VALUE + 1;
+                            }
+                            if (lowerBound > Float.MAX_VALUE) {
+                                lowerBound = (long) Float.MAX_VALUE - 1;
+                            }
+                            else if (lowerBound < Float.MIN_VALUE) {
+                                lowerBound = (long) Float.MIN_VALUE;
+                            }
+                            if (extent > Float.MAX_VALUE) {
+                                extent = (long) Float.MAX_VALUE;
+                            }
+                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.floatValue(), upperBound.floatValue()), extent.floatValue()));
+                            break;
+                        case TILEDB_FLOAT64:
+                            if (upperBound > Double.MAX_VALUE) {
+                                upperBound = (long) Double.MAX_VALUE - 1;
+                            }
+                            else if (upperBound < Double.MIN_VALUE) {
+                                upperBound = (long) Double.MIN_VALUE + 1;
+                            }
+                            if (lowerBound > Double.MAX_VALUE) {
+                                lowerBound = (long) Double.MAX_VALUE - 1;
+                            }
+                            else if (lowerBound < Double.MIN_VALUE) {
+                                lowerBound = (long) Double.MIN_VALUE;
+                            }
+                            if (extent > Double.MAX_VALUE) {
+                                extent = (long) Double.MAX_VALUE;
+                            }
+                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.doubleValue(), upperBound.doubleValue()), extent.doubleValue()));
+                            break;
+                        default:
+                            throw new TileDBError("Invalid dimension datatype order, must be one of [TINYINT, SMALLINT, INTEGER, BIGINT, REAL, DOUBLE]");
+                    }
+                }
+                else {
+                    Attribute attribute = new Attribute(localCtx, columnName, classType);
+                    if (isVarcharType(column.getType())) {
+                        VarcharType varcharType = (VarcharType) column.getType();
+                        if (varcharType.isUnbounded() || varcharType.getLengthSafe() > 1) {
+                            attribute.setCellValNum(TILEDB_VAR_NUM);
+                        }
+                    }
+                    else if (column.getType().equals(DATE)) {
+                        attribute.setCellValNum(TILEDB_VAR_NUM);
+                    }
+                    arraySchema.addAttribute(attribute);
+                }
+
+                columnNames.add(columnName);
+            }
+
+            // Set cell and tile order
+            String cellOrderStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.CellOrder)).toUpperCase();
+            String tileOrderStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.TileOrder)).toUpperCase();
+
+            switch (cellOrderStr) {
+                case "ROW_MAJOR":
+                    arraySchema.setCellOrder(Layout.TILEDB_ROW_MAJOR);
+                    break;
+                case "COL_MAJOR":
+                    arraySchema.setCellOrder(Layout.TILEDB_COL_MAJOR);
+                default:
+                    throw new TileDBError("Invalid cell order, must be one of [ROW_MAJOR, COL_MAJOR]");
+            }
+
+            switch (tileOrderStr) {
+                case "ROW_MAJOR":
+                    arraySchema.setTileOrder(Layout.TILEDB_ROW_MAJOR);
+                    break;
+                case "COL_MAJOR":
+                    arraySchema.setTileOrder(Layout.TILEDB_COL_MAJOR);
+                default:
+                    throw new TileDBError("Invalid tile order, must be one of [ROW_MAJOR, COL_MAJOR]");
+            }
+
+            // Add domain
+            arraySchema.setDomain(domain);
+
+            // Validate schema
+            arraySchema.check();
+
+            Array.create(uri, arraySchema);
+
+            // Clean up
+            domain.close();
+            arraySchema.close();
+
+            TileDBTable tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri));
+
+            // Loop through all columns and build list of column handles in the proper ordering. Order is important here
+            // because we will use the list to avoid hashmap lookups for better performance.
+            List<TileDBColumnHandle> columnHandles = new ArrayList<>(Collections.nCopies(columnNames.size(), null));
+            for (TileDBColumn column : tileDBTable.getColumns()) {
+                for (int i = 0; i < columnNames.size(); i++) {
+                    if (column.getName().toLowerCase(Locale.ENGLISH).equals(columnNames.get(i))) {
+                        columnHandles.set(i, new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getTileDBType(), column.getIsVariableLength(), column.getIsDimension()));
+                    }
+                }
+            }
+
+            return new TileDBOutputTableHandle(
+                    connectorId,
+                    "tiledb",
+                    schema,
+                    table,
+                    columnHandles,
+                    uri);
+        }
+        catch (TileDBError tileDBError) {
+            throw new PrestoException(TILEDB_CREATE_TABLE_ERROR, tileDBError);
+        }
+        catch (URISyntaxException e) {
+            throw new PrestoException(TILEDB_CREATE_TABLE_ERROR, e);
+        }
+    }}
