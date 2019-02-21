@@ -18,6 +18,7 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.type.Type;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.tiledb.java.api.Datatype;
 
 import java.util.Objects;
 
@@ -36,6 +37,8 @@ public final class TileDBColumnHandle
     private final String connectorId;
     private final String columnName;
     private final Type columnType;
+    private final Datatype columnTileDBType;
+    private final boolean isVariableLength;
     private final boolean isDimension;
 
     @JsonCreator
@@ -43,11 +46,15 @@ public final class TileDBColumnHandle
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("columnName") String columnName,
             @JsonProperty("columnType") Type columnType,
+            @JsonProperty("columnTileDBType") Datatype columnTileDBType,
+            @JsonProperty("isVariableLength") Boolean isVariableLength,
             @JsonProperty("isDimension") Boolean isDimension)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.columnName = requireNonNull(columnName, "columnName is null");
         this.columnType = requireNonNull(columnType, "columnType is null");
+        this.columnTileDBType = requireNonNull(columnTileDBType, "columnTileDBType is null");
+        this.isVariableLength = requireNonNull(isVariableLength, "isVariableLength is null");
         this.isDimension = requireNonNull(isDimension, "isDimension is null");
     }
 
@@ -67,6 +74,18 @@ public final class TileDBColumnHandle
     public Type getColumnType()
     {
         return columnType;
+    }
+
+    @JsonProperty
+    public Datatype getColumnTileDBType()
+    {
+        return columnTileDBType;
+    }
+
+    @JsonProperty
+    public Boolean getIsVariableLength()
+    {
+        return isVariableLength;
     }
 
     @JsonProperty
@@ -110,6 +129,8 @@ public final class TileDBColumnHandle
                 .add("connectorId", connectorId)
                 .add("columnName", columnName)
                 .add("columnType", columnType)
+                .add("columnTileDBType", columnTileDBType)
+                .add("isVariableLength", isVariableLength)
                 .add("isDimension", isDimension)
                 .toString();
     }
