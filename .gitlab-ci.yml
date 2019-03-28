@@ -33,6 +33,18 @@ jdk8:
     - ./mvnw install $MAVEN_FAST_INSTALL -am
     - ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B $TEST_FLAGS
 
+# Test building release package, this validates build and formatting
+build_package_test:
+  image: openjdk:8
+  stage: test
+  tags:
+    - docker
+  variables:
+    TEST_SPECIFIC_MODULES: presto-tiledb
+  script:
+    - ./mvnw -v
+    - ./mvnw package -DskipTests
+
 deploy_artifact:
   image: openjdk:8
   stage: deploy
