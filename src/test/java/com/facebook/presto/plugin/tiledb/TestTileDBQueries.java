@@ -517,7 +517,7 @@ public class TestTileDBQueries
         StringBuilder builder = new StringBuilder();
         for (int y = 0; y < 1; y++) {
             for (int x = 20; x < 21; x++) {
-                builder.append(format("(%s, %s, %s)", y, x, (y +  x)*100));
+                builder.append(format("(%s, %s, %s)", y, x, (y + x) * 100));
                 if (y < 1 - 1 || x < 21 - 1) {
                     builder.append(", ");
                 }
