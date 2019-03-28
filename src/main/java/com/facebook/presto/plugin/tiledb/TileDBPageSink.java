@@ -86,6 +86,7 @@ public class TileDBPageSink
     private final Map<String, Integer> columnOrder;
 
     private final Map<String, Integer> dimensionOrder;
+    private final List<String> dimensionNameOrder;
     private final TileDBOutputTableHandle table;
     private final int maxBufferSize; // Max Buffer
 
@@ -111,10 +112,12 @@ public class TileDBPageSink
 
             // For coordinates we need to have dimensions in their proper order, here we will get the ordering
             dimensionOrder = new HashMap<>();
+            dimensionNameOrder = new ArrayList<>();
             int i = 0;
             try (ArraySchema arraySchema = array.getSchema(); Domain domain = arraySchema.getDomain()) {
                 for (Dimension dimension : domain.getDimensions()) {
                     dimensionOrder.put(dimension.getName(), i++);
+                    dimensionNameOrder.add(dimension.getName());
                     dimension.close();
                 }
             }
@@ -228,7 +231,7 @@ public class TileDBPageSink
                     }
 
                     // Add dimension in proper order to coordinates
-                    for (String dimension : dimensionOrder.keySet()) {
+                    for (String dimension : dimensionNameOrder) {
                         int channel = columnOrder.get(dimension);
                         Long bufferEffectiveSize = bufferEffectiveSizes.get(TILEDB_COORDS);
                         Pair<NativeArray, NativeArray> bufferPair = buffers.get(TILEDB_COORDS);

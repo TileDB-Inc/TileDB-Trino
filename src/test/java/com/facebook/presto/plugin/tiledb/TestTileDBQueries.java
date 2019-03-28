@@ -491,6 +491,58 @@ public class TestTileDBQueries
         dropArray(arrayName);
     }
 
+    @Test
+    public void testInsertOrderIssue()
+    {
+        String arrayName = "test_insert_order_issues_base_table";
+        dropArray(arrayName);
+        String insertArrayName = "test_insert_order_issues_insert_table";
+        dropArray(insertArrayName);
+
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "y bigint WITH (dimension=true, lower_bound=0, upper_bound=10), " +
+                "x bigint WITH (dimension=true, lower_bound=20, upper_bound=30), " +
+                "a1 integer" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+
+        String createSql2 = format("CREATE TABLE %s(" +
+                "y bigint WITH (dimension=true, lower_bound=0, upper_bound=10), " +
+                "x bigint WITH (dimension=true, lower_bound=20, upper_bound=30), " +
+                "a1 integer" +
+                ") WITH (uri='%s')", insertArrayName, insertArrayName);
+        queryRunner.execute(createSql2);
+
+        StringBuilder builder = new StringBuilder();
+        for (int y = 0; y < 1; y++) {
+            for (int x = 20; x < 21; x++) {
+                builder.append(format("(%s, %s, %s)", y, x, (y +  x)*100));
+                if (y < 1 - 1 || x < 21 - 1) {
+                    builder.append(", ");
+                }
+            }
+        }
+
+        String insertSql = format("INSERT INTO %s (y, x, a1) VALUES %s", arrayName, builder.toString());
+        getQueryRunner().execute(insertSql);
+
+        String insertSelectSql = format("INSERT INTO %s (y, x, a1) SELECT y, x, a1 FROM %s", insertArrayName, arrayName);
+        getQueryRunner().execute(insertSelectSql);
+
+        insertSelectSql = format("INSERT INTO %s (y, x, a1) SELECT * FROM %s", insertArrayName, arrayName);
+        getQueryRunner().execute(insertSelectSql);
+
+        insertSelectSql = format("INSERT INTO %s SELECT y, x, a1 FROM %s", insertArrayName, arrayName);
+        getQueryRunner().execute(insertSelectSql);
+
+        insertSelectSql = format("INSERT INTO %s  SELECT * FROM %s", insertArrayName, arrayName);
+        getQueryRunner().execute(insertSelectSql);
+
+        dropArray(arrayName);
+        dropArray(insertArrayName);
+    }
+
     private void create1DVector(String arrayName)
     {
         QueryRunner queryRunner = getQueryRunner();
