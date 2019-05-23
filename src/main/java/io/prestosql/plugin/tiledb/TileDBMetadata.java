@@ -687,4 +687,11 @@ public class TileDBMetadata
         catch (URISyntaxException e) {
             throw new PrestoException(TILEDB_CREATE_TABLE_ERROR, e);
         }
-    }}
+    }
+
+    @Override
+    public boolean usesLegacyTableLayouts()
+    {
+        return true;
+    }
+}
