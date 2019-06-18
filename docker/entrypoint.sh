@@ -15,4 +15,4 @@ do
 done
 printf "\n"
 
-${PRESTO_HOME}/bin/presto-cli-${PRESTO_VERSION}-executable.jar "$@"
+${PRESTO_HOME}/bin/presto-cli-${PRESTO_VERSION}-executable.jar --schema tiledb --catalog tiledb "$@"
