@@ -43,7 +43,7 @@ is required.
 Examples: 
 
 ```
-show columns from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global";
+show columns from "file:///opt/tiledb_example_arrays/dense_global";
 Column |  Type   | Extra |  Comment  
 --------+---------+-------+-----------
  rows   | integer |       | Dimension 
@@ -54,7 +54,7 @@ Column |  Type   | Extra |  Comment
 
 
 ```
-select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" WHERE rows = 3 AND cols between 1 and 2;
+select * from "file:///opt/tiledb_example_arrays/dense_global" WHERE rows = 3 AND cols between 1 and 2;
  rows | cols | a 
 ------+------+---
     3 |    1 | 5 
@@ -73,14 +73,14 @@ It is possible to specify a file that contains sql to be run from the docker
 image:
 
 ```
-echo 'select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" limit 10;' > example.sql
+echo 'select * from "file:///opt/tiledb_example_arrays/dense_global" limit 10;' > example.sql
 docker run -it --rm -v ${PWD}/example.sql:/tmp/example.sql tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --file /tmp/example.sql
 ```
 
 You can also run a sql statement directly:
 
 ```
-docker run -it --rm tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --execute 'select * from tiledb.tiledb."file:///opt/tiledb_example_arrays/dense_global" limit 10;'
+docker run -it --rm tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --execute 'select * from "file:///opt/tiledb_example_arrays/dense_global" limit 10;'
 ```
 
 
