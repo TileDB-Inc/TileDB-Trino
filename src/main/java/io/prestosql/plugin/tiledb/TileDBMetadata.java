@@ -634,6 +634,7 @@ public class TileDBMetadata
                     break;
                 case "COL_MAJOR":
                     arraySchema.setCellOrder(Layout.TILEDB_COL_MAJOR);
+                    break;
                 default:
                     throw new TileDBError("Invalid cell order, must be one of [ROW_MAJOR, COL_MAJOR]");
             }
@@ -644,6 +645,7 @@ public class TileDBMetadata
                     break;
                 case "COL_MAJOR":
                     arraySchema.setTileOrder(Layout.TILEDB_COL_MAJOR);
+                    break;
                 default:
                     throw new TileDBError("Invalid tile order, must be one of [ROW_MAJOR, COL_MAJOR]");
             }
