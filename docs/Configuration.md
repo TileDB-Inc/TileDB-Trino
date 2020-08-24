@@ -22,6 +22,7 @@ plugin-wide.
 | write-buffer-size | 10485760 | Integer | Set the max write buffer size per attribute |
 | aws-access-key-id | "" | String | AWS_ACCESS_KEY_ID for s3 access |
 | aws-secret-access-key | "" | String | AWS_SECRET_ACCESS_KEY for s3 access |
+| tiledb-config | "" | String | TileDB config parameters in key1=value1,key2=value2 form |
 
 
 ## Session Parameters
@@ -39,3 +40,4 @@ the plugin configuration default for the equivalent setting.
 | splits | -1 | Integer | Set the number of splits to use per query, -1 means splits will be equal to number of workers |
 | split_only_predicates | false | Boolean | Split only based on predicates pushed down from where clause. For sparse array splitting evening across all domains can create skewed splits |
 | enable_stats | false | Boolean | Enable collecting and dumping of connector stats to presto log |
+| tiledb_config | "" | String | TileDB config parameters in key1=value1,key2=value2 form |
