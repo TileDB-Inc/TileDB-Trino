@@ -16,6 +16,7 @@ package io.prestosql.plugin.tiledb;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
@@ -25,11 +26,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
-import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
-import io.tiledb.java.api.Dimension;
-import io.tiledb.java.api.Domain;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.NativeArray;
 import io.tiledb.java.api.Pair;
@@ -45,9 +43,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_PAGE_SINK_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
@@ -63,7 +61,6 @@ import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
-import static io.tiledb.java.api.Constants.TILEDB_COORDS;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -75,8 +72,9 @@ public class TileDBPageSink
         implements ConnectorPageSink
 {
     private static final DateTimeFormatter DATE_FORMATTER = ISODateTimeFormat.date().withZoneUTC();
+    private static final Logger log = Logger.get(TileDBPageSink.class);
 
-    private final Query query;
+    private Query query;
     private final Array array;
     private final Context ctx;
 
@@ -85,8 +83,6 @@ public class TileDBPageSink
     // This is used specifically for fetching and storing dimensions in proper order for tiledb coordinates
     private final Map<String, Integer> columnOrder;
 
-    private final Map<String, Integer> dimensionOrder;
-    private final List<String> dimensionNameOrder;
     private final TileDBOutputTableHandle table;
     private final int maxBufferSize; // Max Buffer
 
@@ -110,18 +106,6 @@ public class TileDBPageSink
             // All writes are unordered
             query.setLayout(Layout.TILEDB_UNORDERED);
 
-            // For coordinates we need to have dimensions in their proper order, here we will get the ordering
-            dimensionOrder = new HashMap<>();
-            dimensionNameOrder = new ArrayList<>();
-            int i = 0;
-            try (ArraySchema arraySchema = array.getSchema(); Domain domain = arraySchema.getDomain()) {
-                for (Dimension dimension : domain.getDimensions()) {
-                    dimensionOrder.put(dimension.getName(), i++);
-                    dimensionNameOrder.add(dimension.getName());
-                    dimension.close();
-                }
-            }
-
             this.table = handle;
         }
         catch (TileDBError tileDBError) {
@@ -133,6 +117,21 @@ public class TileDBPageSink
         for (int i = 0; i < columnHandles.size(); i++) {
             columnOrder.put(columnHandles.get(i).getColumnName(), i);
         }
+    }
+
+    /**
+     * Reset query, as of TileDB 2.0 a query object should not be reused for writing unless in global order
+     * @param buffers
+     * @throws TileDBError
+     */
+    private void resetQuery(Map<String, Pair<NativeArray, NativeArray>> buffers) throws TileDBError
+    {
+        // Create query object
+        query.close();
+        query = new Query(array, QueryType.TILEDB_WRITE);
+        // All writes are unordered
+        query.setLayout(Layout.TILEDB_UNORDERED);
+        resetBuffers(buffers);
     }
 
     /**
@@ -163,31 +162,17 @@ public class TileDBPageSink
             boolean isVariableLength = false;
             TileDBColumnHandle columnHandle = columnHandles.get(channel);
             String columnName = columnHandle.getColumnName();
-            boolean isDimension = dimensionOrder.containsKey(columnName);
             NativeArray values = null;
             NativeArray offsets = null;
 
-            // If column is not a dimension check to see if its an attribute
-            if (!isDimension) {
-                type = columnHandle.getColumnTileDBType();
-                isVariableLength = columnHandle.getIsVariableLength();
-                // If the attribute is variable length create offset and values arrays
-                values = new NativeArray(ctx, maxBufferSize, type);
-                if (isVariableLength) {
-                    offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
-                }
-                buffers.put(columnName, new Pair<>(offsets, values));
+            type = columnHandle.getColumnTileDBType();
+            isVariableLength = columnHandle.getIsVariableLength();
+            // If the attribute is variable length create offset and values arrays
+            values = new NativeArray(ctx, maxBufferSize, type);
+            if (isVariableLength) {
+                offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
             }
-        }
-        // Get list of dimensions
-        try (ArraySchema arraySchema = array.getSchema(); Domain domain = arraySchema.getDomain()) {
-            List<Dimension> dimensions = domain.getDimensions();
-            Datatype dimType = dimensions.get(0).getType();
-            NativeArray coordinates = new NativeArray(ctx, maxBufferSize * dimensions.size(), dimType);
-            buffers.put(TILEDB_COORDS, new Pair<>(null, coordinates));
-            for (Dimension d : dimensions) {
-                d.close();
-            }
+            buffers.put(columnName, new Pair<>(offsets, values));
         }
     }
 
@@ -200,45 +185,34 @@ public class TileDBPageSink
     public CompletableFuture<?> appendPage(Page page)
     {
         try {
-            Map<String, Long> bufferEffectiveSizes = new HashMap<>();
+            Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes = new HashMap<>();
             Map<String, Pair<NativeArray, NativeArray>> buffers = new HashMap<>();
             initBufferEffectiveSizes(bufferEffectiveSizes);
             // Position is row, channel is column
-            resetBuffers(buffers);
+            resetQuery(buffers);
 
             // Loop through each row for the column
             for (int position = 0; position < page.getPositionCount(); position++) {
-                Map<String, Long> previousBufferEffectiveSizes = bufferEffectiveSizes;
+                Map<String, Pair<Optional<Long>, Long>> previousBufferEffectiveSizes = bufferEffectiveSizes;
                 try {
                     for (int channel = 0; channel < page.getChannelCount(); channel++) {
                         TileDBColumnHandle columnHandle = columnHandles.get(channel);
                         String columnName = columnHandle.getColumnName();
-                        // If the current column is a dimension we will skip, as all dimensions are handled at the end of the row
-                        if (dimensionOrder.containsKey(columnName)) {
-                            continue;
-                        }
+
                         // Get the current effective size of the buffers
-                        Long bufferEffectiveSize = bufferEffectiveSizes.get(columnName);
-                        int bufferPosition = toIntExact(bufferEffectiveSize);
+                        Pair<Optional<Long>, Long> bufferEffectiveSize = bufferEffectiveSizes.get(columnName);
+                        int bufferPosition = toIntExact(bufferEffectiveSize.getSecond());
+                        Optional<Long> offsetSize = bufferEffectiveSize.getFirst();
                         // If we have a dimension we need to set the position for the coordinate buffer based on dimension ordering
                         Pair<NativeArray, NativeArray> bufferPair = buffers.get(columnName);
                         // For variable length attributes we always start the position at the current max size.
                         if (columnHandle.getIsVariableLength()) {
-                            bufferPair.getFirst().setItem(position, bufferEffectiveSize);
+                            bufferPair.getFirst().setItem(toIntExact(offsetSize.get()), bufferEffectiveSize.getSecond());
+                            offsetSize = Optional.of(offsetSize.get() + 1);
                         }
                         // Add this value to the array
                         Long newBufferEffectiveSize = appendColumn(page, position, channel, bufferPair.getSecond(), bufferPosition);
-                        bufferEffectiveSizes.put(columnName, newBufferEffectiveSize);
-                    }
-
-                    // Add dimension in proper order to coordinates
-                    for (String dimension : dimensionNameOrder) {
-                        int channel = columnOrder.get(dimension);
-                        Long bufferEffectiveSize = bufferEffectiveSizes.get(TILEDB_COORDS);
-                        Pair<NativeArray, NativeArray> bufferPair = buffers.get(TILEDB_COORDS);
-                        int bufferPosition = toIntExact(bufferEffectiveSize);
-                        Long newBufferEffectiveSize = appendColumn(page, position, channel, bufferPair.getSecond(), bufferPosition);
-                        bufferEffectiveSizes.put(TILEDB_COORDS, newBufferEffectiveSize);
+                        bufferEffectiveSizes.put(columnName, new Pair<>(offsetSize, newBufferEffectiveSize));
                     }
                 }
                 catch (IndexOutOfBoundsException e) {
@@ -249,7 +223,7 @@ public class TileDBPageSink
                     if (submitQuery(buffers, bufferEffectiveSizes) == QueryStatus.TILEDB_FAILED) {
                         throw new PrestoException(TILEDB_PAGE_SINK_ERROR, e);
                     }
-                    resetBuffers(buffers);
+                    resetQuery(buffers);
                     bufferEffectiveSizes.clear();
                     initBufferEffectiveSizes(bufferEffectiveSizes);
                 }
@@ -279,14 +253,16 @@ public class TileDBPageSink
      * Initialize the map holding the effective buffer sizes
      * @param bufferEffectiveSizes
      */
-    private void initBufferEffectiveSizes(Map<String, Long> bufferEffectiveSizes)
+    private void initBufferEffectiveSizes(Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes)
     {
-        for (String columnName : columnHandles.stream().map(TileDBColumnHandle::getColumnName).collect(Collectors.toList())) {
-            if (!dimensionOrder.containsKey(columnName)) {
-                bufferEffectiveSizes.put(columnName, 0L);
+        for (TileDBColumnHandle column : columnHandles) {
+            if (column.getIsVariableLength()) {
+                bufferEffectiveSizes.put(column.getColumnName(), new Pair<>(Optional.of(0L), 0L));
+            }
+            else {
+                bufferEffectiveSizes.put(column.getColumnName(), new Pair<>(Optional.empty(), 0L));
             }
         }
-        bufferEffectiveSizes.put(TILEDB_COORDS, 0L);
     }
 
     /**
@@ -296,26 +272,20 @@ public class TileDBPageSink
      * @return QueryStatus
      * @throws TileDBError
      */
-    private QueryStatus submitQuery(Map<String, Pair<NativeArray, NativeArray>> buffers, Map<String, Long> bufferEffectiveSizes) throws TileDBError
+    private QueryStatus submitQuery(Map<String, Pair<NativeArray, NativeArray>> buffers, Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes) throws TileDBError
     {
         // We have to keep track of if we created a new buffer or not and if we should clear it
         List<NativeArray> buffersToClear = new ArrayList<>();
         // We need to know how many elements are suppose to be in offset buffers. We can check this by seeing the effective size of the the coordinates buffer
-        long effectiveElementsInOffsetBuffers = bufferEffectiveSizes.get(TILEDB_COORDS) / dimensionOrder.size();
+        Pair<Optional<Long>, Long> sizes = bufferEffectiveSizes.values().stream().findFirst().get();
+        long effectiveElementsInOffsetBuffers = sizes.getFirst().orElseGet(sizes::getSecond);
 
         // Loop through each buffer to set it on query object
         for (Map.Entry<String, Pair<NativeArray, NativeArray>> bufferEntry : buffers.entrySet()) {
             NativeArray offsets = bufferEntry.getValue().getFirst();
             NativeArray values = bufferEntry.getValue().getSecond();
             // LastValuePosition holds the position of the last element in the buffer
-            long effectiveElementInBuffer;
-            // Handle coordinate buffer
-            if (bufferEntry.getKey().equals(TILEDB_COORDS)) {
-                effectiveElementInBuffer = effectiveElementsInOffsetBuffers * dimensionOrder.size();
-            }
-            else {
-                effectiveElementInBuffer = bufferEffectiveSizes.get(bufferEntry.getKey());
-            }
+            long effectiveElementInBuffer = bufferEffectiveSizes.get(bufferEntry.getKey()).getSecond();
             // If the buffer is larger than the last position we need to resize
             if (values.getSize() > effectiveElementInBuffer) {
                 if (values.getJavaType().equals(String.class)) {

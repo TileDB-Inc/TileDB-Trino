@@ -55,7 +55,7 @@ public class TileDBColumnProperties
                 longProperty(
                         Extent,
                         "Dimension Extent",
-                        10000L,
+                        10L,
                         false));
     }
 

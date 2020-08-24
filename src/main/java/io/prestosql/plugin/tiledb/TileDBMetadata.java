@@ -182,6 +182,9 @@ public class TileDBMetadata
                             Object nonEmptyMin = domain.getFirst();
                             Object nonEmptyMax = domain.getSecond();
                             Type type = columnHandle.getColumnType();
+                            if (nonEmptyMin == null || nonEmptyMax == null) {
+                                continue;
+                            }
 
                             Range range;
                             if (REAL.equals(type)) {

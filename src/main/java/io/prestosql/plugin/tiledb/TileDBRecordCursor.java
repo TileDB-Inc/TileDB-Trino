@@ -55,7 +55,6 @@ import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEnableStats;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getReadBufferSize;
 import static io.prestosql.spi.type.RealType.REAL;
-import static io.tiledb.java.api.Constants.TILEDB_COORDS;
 import static io.tiledb.java.api.Datatype.TILEDB_UINT64;
 import static io.tiledb.java.api.QueryStatus.TILEDB_COMPLETED;
 import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
@@ -63,6 +62,7 @@ import static io.tiledb.java.api.QueryStatus.TILEDB_UNINITIALIZED;
 import static io.tiledb.java.api.Types.getJavaType;
 import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Float.intBitsToFloat;
+import static java.lang.Math.max;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -95,7 +95,6 @@ public class TileDBRecordCursor
     private final Array array;
     private final List<TileDBColumnHandle> columnHandles;
     private Map<String, Pair<Long, Long>> queryResultBufferElements;
-    private final Datatype domainType;
     private Map<String, List<Pair<Long, Long>>> functionTimings;
     private final String queryId;
 
@@ -113,7 +112,7 @@ public class TileDBRecordCursor
      * Attribute array so we can avoid looking up attributes by string name
      * This is indexed based on columnHandles indexing (aka query field indexes)
      */
-    private final Datatype[] attributeTypes;
+    private final Datatype[] fieldTypes;
 
     /**
      * The array schema instance. No need to close()
@@ -190,11 +189,12 @@ public class TileDBRecordCursor
         this.columnHandles = columnHandles;
         this.array = array;
         this.query = query;
-        this.queryBuffers = new ArrayList<>(Collections.nCopies(columnHandles.size(), null));
-        this.queryResultArrays = new ArrayList<>(Collections.nCopies(columnHandles.size(), null));
+        int columnCount = max(this.columnHandles.size(), 1);
+        this.queryBuffers = new ArrayList<>(Collections.nCopies(columnCount, null));
+        this.queryResultArrays = new ArrayList<>(Collections.nCopies(columnCount, null));
         this.dimensionIndexes = new HashMap<>();
         this.columnIndexLookup = new HashMap<>();
-        this.attributeTypes = new Datatype[this.columnHandles.size()];
+        this.fieldTypes = new Datatype[columnCount];
         this.queryStatus = TILEDB_UNINITIALIZED;
 
         // Set initial max buffer sizes for reads from session configuration parameter
@@ -214,10 +214,7 @@ public class TileDBRecordCursor
                 Stats.reset();
             }
             this.arraySchema = array.getSchema();
-            try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
-                domainType = domain.getType();
-                initializeQuery(split);
-            }
+            initializeQuery(split);
         }
         catch (TileDBError tileDBError) {
             throw new PrestoException(TILEDB_RECORD_CURSOR_ERROR, tileDBError);
@@ -240,7 +237,24 @@ public class TileDBRecordCursor
             try (Attribute attribute = arraySchema.getAttribute(i)) {
                 if (columnIndexLookup.containsKey(attribute.getName())) {
                     int field = columnIndexLookup.get(attribute.getName());
-                    attributeTypes[field] = attribute.getType();
+                    fieldTypes[field] = attribute.getType();
+                }
+            }
+        }
+
+        try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
+            // If we're empty let's atleast select the first dimension
+            // this is needed for count queries
+            if (columnIndexLookup.isEmpty()) {
+                columnIndexLookup.put(domain.getDimension(0).getName(), 0);
+            }
+
+            for (int i = 0; i < domain.getNDim(); i++) {
+                try (Dimension dim = domain.getDimension(i)) {
+                    if (columnIndexLookup.containsKey(dim.getName())) {
+                        int field = columnIndexLookup.get(dim.getName());
+                        fieldTypes[field] = dim.getType();
+                    }
                 }
             }
         }
@@ -251,21 +265,21 @@ public class TileDBRecordCursor
         HashMap<String, Pair<Long, Long>> maxSizes = this.array.maxBufferElements(subArray);
 
         // Compute an upper bound on the number of results in the subarray.
-        totalNumRecordsUB = maxSizes.get(TILEDB_COORDS).getSecond() / dimensionIndexes.size();
+        totalNumRecordsUB = maxSizes.values().iterator().next().getSecond();
         query.setSubarray(subArray);
 
         // Build buffers for each column (attribute) in the query.
         for (Map.Entry<String, Pair<Long, Long>> maxSize : maxSizes.entrySet()) {
             String columnName = maxSize.getKey();
-            boolean isCoords = columnName.equals(TILEDB_COORDS);
 
             // Check to see if column is in request list, if not don't set a buffer
-            if (!columnIndexLookup.containsKey(columnName) && !isCoords) {
+            // Always set dimension buffers though, this is needed for count queries and should be optimized
+            if (!columnIndexLookup.containsKey(columnName)) {
                 continue;
             }
 
             // Allocate and set the buffer on the query object.
-            initQueryBufferForAttribute(columnName, maxSize.getValue());
+            initQueryBufferForField(columnName, maxSize.getValue());
         }
 
         recordFunctionTime("initializeQuery", timer);
@@ -274,20 +288,22 @@ public class TileDBRecordCursor
     /**
      * Allocates a NativeArray buffer for the given attribute and adds it to the query object.
      */
-    private void initQueryBufferForAttribute(String attributeName, Pair<Long, Long> maxBufferElements) throws TileDBError
+    private void initQueryBufferForField(String field, Pair<Long, Long> maxBufferElements) throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
-        boolean isCoords = attributeName.equals(TILEDB_COORDS);
+        boolean isAttribute = arraySchema.hasAttribute(field);
         boolean isVar;
         Datatype type;
 
         // Get the datatype and if the attribute is variable-sized
-        if (isCoords) {
-            type = domainType;
-            isVar = false;
+        if (!isAttribute) {
+            try (io.tiledb.java.api.Domain domain = arraySchema.getDomain(); Dimension dim = domain.getDimension(field)) {
+                type = dim.getType();
+                isVar = dim.isVar();
+            }
         }
         else {
-            try (Attribute attr = arraySchema.getAttribute(attributeName)) {
+            try (Attribute attr = arraySchema.getAttribute(field)) {
                 type = attr.getType();
                 isVar = attr.isVar();
             }
@@ -301,22 +317,12 @@ public class TileDBRecordCursor
             // Allocate a buffer for the offsets
             bufferSize = getClampedBufferSize(maxBufferElements.getFirst().intValue(), TILEDB_UINT64.getNativeSize());
             NativeArray offsetsBuffer = new NativeArray(tileDBClient.getCtx(), bufferSize, TILEDB_UINT64);
-            query.setBuffer(attributeName, offsetsBuffer, valuesBuffer);
-            queryBuffers.set(columnIndexLookup.get(attributeName), new Pair<>(offsetsBuffer, valuesBuffer));
+            query.setBuffer(field, offsetsBuffer, valuesBuffer);
+            queryBuffers.set(columnIndexLookup.get(field), new Pair<>(offsetsBuffer, valuesBuffer));
         }
         else {
-            query.setBuffer(attributeName, valuesBuffer);
-            if (isCoords) {
-                // If this is coordinates buffer we need to set it for each dimension index
-                for (Map.Entry<String, Integer> entry : dimensionIndexes.entrySet()) {
-                    if (columnIndexLookup.containsKey(entry.getKey())) {
-                        queryBuffers.set(columnIndexLookup.get(entry.getKey()), new Pair<>(null, valuesBuffer));
-                    }
-                }
-            }
-            else {
-                queryBuffers.set(columnIndexLookup.get(attributeName), new Pair<>(null, valuesBuffer));
-            }
+            query.setBuffer(field, valuesBuffer);
+            queryBuffers.set(columnIndexLookup.get(field), new Pair<>(null, valuesBuffer));
         }
 
         recordFunctionTime("initQueryBufferForAttribute", timer);
@@ -351,7 +357,7 @@ public class TileDBRecordCursor
         try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
             List<Dimension> dimensions = domain.getDimensions();
             HashMap<String, Pair> nonEmptyDomain = this.array.nonEmptyDomain();
-            subArray = new NativeArray(tileDBClient.getCtx(), 2 * dimensions.size(), domainType);
+            subArray = new NativeArray(tileDBClient.getCtx(), 2 * dimensions.size(), dimensions.get(0).getType());
 
             // Compute and add each dimension bounds to the subarray.
             int dimIdx = 0;
@@ -677,38 +683,12 @@ public class TileDBRecordCursor
 
         query.resetBuffers();
 
-        // Double coord buffer first, else we'll loop through and double it each time!
-        Pair<NativeArray, NativeArray> coordsBuffer = null;
-        for (Map.Entry<String, Integer> dim : dimensionIndexes.entrySet()) {
-            if (columnIndexLookup.containsKey(dim.getKey())) {
-                coordsBuffer = queryBuffers.get(columnIndexLookup.get(dim.getKey()));
-                break;
-            }
-        }
-
-        if (coordsBuffer != null) {
-            NativeArray coordsBufferNew = new NativeArray(tileDBClient.getCtx(), 2 * coordsBuffer.getSecond().getSize(), domainType);
-            coordsBuffer.getSecond().close();
-            coordsBuffer.setSecond(coordsBufferNew);
-            for (Map.Entry<String, Integer> dim : dimensionIndexes.entrySet()) {
-                if (columnIndexLookup.containsKey(dim.getKey())) {
-                    queryBuffers.set(columnIndexLookup.get(dim.getKey()), coordsBuffer);
-                }
-            }
-            query.setBuffer(TILEDB_COORDS, coordsBuffer.getSecond());
-        }
-
         for (int i = 0; i < queryBuffers.size(); i++) {
-            // If this is a dimension skip it, we double the coords buffer to start
-            if (dimensionIndexes.containsKey(columnHandles.get(i).getColumnName())) {
-                continue;
-            }
-
             Pair<NativeArray, NativeArray> nativeArrayPair = queryBuffers.get(i);
             NativeArray offsetBuffer = nativeArrayPair.getFirst();
             NativeArray valuesBuffer = nativeArrayPair.getSecond();
             if (valuesBuffer != null) {
-                NativeArray tmp = new NativeArray(tileDBClient.getCtx(), 2 * valuesBuffer.getSize(), attributeTypes[i]);
+                NativeArray tmp = new NativeArray(tileDBClient.getCtx(), 2 * valuesBuffer.getSize(), fieldTypes[i]);
                 valuesBuffer.close();
                 valuesBuffer = tmp;
             }
@@ -784,8 +764,28 @@ public class TileDBRecordCursor
 
                     // Compute the number of cells (records) that were returned by the query.
                     queryResultBufferElements = query.resultBufferElements();
-                    currentNumRecords = queryResultBufferElements.get(TILEDB_COORDS).getSecond() /
-                            dimensionIndexes.size();
+                    currentNumRecords = 0;
+                    for (Map.Entry<String, Pair<Long, Long>> resultElements : queryResultBufferElements.entrySet()) {
+                        boolean isVar = false;
+                        if (arraySchema.hasAttribute(resultElements.getKey())) {
+                            try (Attribute attr = arraySchema.getAttribute(resultElements.getKey())) {
+                                isVar = attr.isVar();
+                            }
+                        }
+                        else {
+                            try (io.tiledb.java.api.Domain domain = arraySchema.getDomain(); Dimension dim = domain.getDimension(resultElements.getKey())) {
+                                isVar = dim.isVar();
+                            }
+                        }
+
+                        if (isVar) {
+                            currentNumRecords = resultElements.getValue().getFirst();
+                        }
+                        else {
+                            currentNumRecords = resultElements.getValue().getSecond();
+                        }
+                        break;
+                    }
 
                     // Increase the buffer allocation and resubmit if necessary.
                     if (queryStatus == TILEDB_INCOMPLETE && currentNumRecords == 0) {  // VERY IMPORTANT!!
@@ -877,18 +877,7 @@ public class TileDBRecordCursor
         Pair<Long, Long> timer = startTimer();
         for (Map.Entry<String, Pair<Long, Long>> bufferElement : queryResultBufferElements.entrySet()) {
             String bufferName = bufferElement.getKey();
-            int index = 0;
-            if (bufferName.equals(TILEDB_COORDS)) {
-                for (Map.Entry<String, Integer> entry : dimensionIndexes.entrySet()) {
-                    if (columnIndexLookup.containsKey(entry.getKey())) {
-                        index = columnIndexLookup.get(entry.getKey());
-                        break;
-                    }
-                }
-            }
-            else {
-                index = columnIndexLookup.get(bufferName);
-            }
+            int index = columnIndexLookup.get(bufferName);
             Pair<NativeArray, NativeArray> bufferPair = queryBuffers.get(index);
             if (bufferPair != null && bufferPair.getFirst() != null) {
                 bytesRead += bufferElement.getValue().getFirst() * bufferPair.getFirst().getNativeTypeSize();
@@ -911,24 +900,12 @@ public class TileDBRecordCursor
         Pair<Long, Long> timer = startTimer();
         for (Map.Entry<String, Pair<Long, Long>> entry : queryResultBufferElements.entrySet()) {
             String attributeName = entry.getKey();
-            if (attributeName.equals(TILEDB_COORDS)) {
-                // If it's the coords, we need to point the field indexes for all the dimensions
-                // to a shared Java array.
-                Object coordsArray = query.getBuffer(TILEDB_COORDS);
-                for (int field = 0; field < columnHandles.size(); field++) {
-                    if (columnHandles.get(field).getIsDimension()) {
-                        queryResultArrays.set(field, new Pair<>(null, coordsArray));
-                    }
-                }
+            int queryBufferIdx = columnIndexLookup.get(attributeName);
+            if (entry.getValue().getFirst() == 0) {
+                queryResultArrays.set(queryBufferIdx, new Pair<>(null, query.getBuffer(attributeName)));
             }
             else {
-                int queryBufferIdx = columnIndexLookup.get(attributeName);
-                if (entry.getValue().getFirst() == 0) {
-                    queryResultArrays.set(queryBufferIdx, new Pair<>(null, query.getBuffer(attributeName)));
-                }
-                else {
-                    queryResultArrays.set(queryBufferIdx, new Pair<>(query.getVarBuffer(attributeName), query.getBuffer(attributeName)));
-                }
+                queryResultArrays.set(queryBufferIdx, new Pair<>(query.getVarBuffer(attributeName), query.getBuffer(attributeName)));
             }
         }
         recordFunctionTime("copyQueryBuffers", timer);
@@ -958,15 +935,7 @@ public class TileDBRecordCursor
         Pair<Long, Long> timer = startTimer();
         long value = 0;
         int index = cursorPosition;
-        Datatype datatype;
-        // Check and handle dimension
-        if (columnHandles.get(field).getIsDimension()) {
-            index = dimensionIndexes.size() * cursorPosition + dimensionIndexes.get(columnHandles.get(field).getColumnName());
-            datatype = domainType;
-        }
-        else {
-            datatype = attributeTypes[field];
-        }
+        Datatype datatype = fieldTypes[field];
 
         Object fieldArray = queryResultArrays.get(field).getSecond();
         switch (datatype) {
@@ -1009,17 +978,7 @@ public class TileDBRecordCursor
         double value = 0;
         String bufferName;
         int index = cursorPosition;
-        Datatype datatype;
-        // Check and handle dimension
-        if (columnHandles.get(field).getIsDimension()) {
-            //return 0;
-            bufferName = TILEDB_COORDS;
-            index = dimensionIndexes.size() * cursorPosition + dimensionIndexes.get(columnHandles.get(field).getColumnName());
-            datatype = domainType;
-        }
-        else {
-            datatype = attributeTypes[field];
-        }
+        Datatype datatype = fieldTypes[field];
 
         Object fieldArray = queryResultArrays.get(field).getSecond();
         switch (datatype) {
