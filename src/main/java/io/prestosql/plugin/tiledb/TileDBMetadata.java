@@ -509,72 +509,74 @@ public class TileDBMetadata
                     // instead of altering the values
                     switch (type) {
                         case TILEDB_INT8:
-                            if (upperBound > Byte.MAX_VALUE) {
-                                upperBound = (long) Byte.MAX_VALUE - 1;
+                            if (extent > Byte.MAX_VALUE) {
+                                extent = 10000L;
+                            }
+                            if (upperBound > Byte.MAX_VALUE - extent) {
+                                upperBound = (long) Byte.MAX_VALUE - extent;
                             }
                             else if (upperBound < Byte.MIN_VALUE) {
-                                upperBound = (long) Byte.MIN_VALUE + 1;
+                                upperBound = (long) Byte.MIN_VALUE + extent;
                             }
                             if (lowerBound > Byte.MAX_VALUE) {
-                                lowerBound = (long) Byte.MAX_VALUE - 1;
+                                lowerBound = (long) Byte.MAX_VALUE - extent;
                             }
                             else if (lowerBound < Byte.MIN_VALUE) {
                                 lowerBound = (long) Byte.MIN_VALUE;
                             }
-                            if (extent > Byte.MAX_VALUE) {
-                                extent = (long) Byte.MAX_VALUE;
-                            }
                             domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.byteValue(), upperBound.byteValue()), extent.byteValue()));
                             break;
                         case TILEDB_INT16:
-                            if (upperBound > Short.MAX_VALUE) {
-                                upperBound = (long) Short.MAX_VALUE - 1;
+                            if (extent > Short.MAX_VALUE) {
+                                extent = 10000L;
+                            }
+                            if (upperBound > Short.MAX_VALUE - extent) {
+                                upperBound = (long) Short.MAX_VALUE - extent;
                             }
                             else if (upperBound < Short.MIN_VALUE) {
-                                upperBound = (long) Short.MIN_VALUE + 1;
+                                upperBound = (long) Short.MIN_VALUE + extent;
                             }
                             if (lowerBound > Short.MAX_VALUE) {
-                                lowerBound = (long) Short.MAX_VALUE - 1;
+                                lowerBound = (long) Short.MAX_VALUE - extent;
                             }
                             else if (lowerBound < Short.MIN_VALUE) {
                                 lowerBound = (long) Short.MIN_VALUE;
                             }
-                            if (extent > Short.MAX_VALUE) {
-                                extent = (long) Short.MAX_VALUE;
-                            }
                             domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.shortValue(), upperBound.shortValue()), extent.shortValue()));
                             break;
                         case TILEDB_INT32:
-                            if (upperBound > Integer.MAX_VALUE) {
-                                upperBound = (long) Integer.MAX_VALUE - 1;
+                            if (extent > Integer.MAX_VALUE) {
+                                extent = 10000L;
+                            }
+                            if (upperBound > Integer.MAX_VALUE - extent) {
+                                upperBound = (long) Integer.MAX_VALUE - extent;
                             }
                             else if (upperBound < Integer.MIN_VALUE) {
-                                upperBound = (long) Integer.MIN_VALUE + 1;
+                                upperBound = (long) Integer.MIN_VALUE + extent;
                             }
                             if (lowerBound > Integer.MAX_VALUE) {
-                                lowerBound = (long) Integer.MAX_VALUE - 1;
+                                lowerBound = (long) Integer.MAX_VALUE - extent;
                             }
                             else if (lowerBound < Integer.MIN_VALUE) {
                                 lowerBound = (long) Integer.MIN_VALUE;
                             }
-
-                            if (extent > Integer.MAX_VALUE) {
-                                extent = (long) Integer.MAX_VALUE;
-                            }
                             domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.intValue(), upperBound.intValue()), extent.intValue()));
                             break;
                         case TILEDB_INT64:
+                            if (upperBound > Long.MAX_VALUE - extent) {
+                                upperBound = (long) Long.MAX_VALUE - extent;
+                            }
                             domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound, upperBound), extent));
                             break;
                         case TILEDB_FLOAT32:
-                            if (upperBound > Float.MAX_VALUE) {
-                                upperBound = (long) Float.MAX_VALUE - 1;
+                            if (upperBound > Float.MAX_VALUE - extent) {
+                                upperBound = (long) Float.MAX_VALUE - extent;
                             }
                             else if (upperBound < Float.MIN_VALUE) {
-                                upperBound = (long) Float.MIN_VALUE + 1;
+                                upperBound = (long) Float.MIN_VALUE + extent;
                             }
                             if (lowerBound > Float.MAX_VALUE) {
-                                lowerBound = (long) Float.MAX_VALUE - 1;
+                                lowerBound = (long) Float.MAX_VALUE - extent;
                             }
                             else if (lowerBound < Float.MIN_VALUE) {
                                 lowerBound = (long) Float.MIN_VALUE;
@@ -585,14 +587,14 @@ public class TileDBMetadata
                             domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.floatValue(), upperBound.floatValue()), extent.floatValue()));
                             break;
                         case TILEDB_FLOAT64:
-                            if (upperBound > Double.MAX_VALUE) {
-                                upperBound = (long) Double.MAX_VALUE - 1;
+                            if (upperBound > Double.MAX_VALUE - extent) {
+                                upperBound = (long) Double.MAX_VALUE - extent;
                             }
                             else if (upperBound < Double.MIN_VALUE) {
-                                upperBound = (long) Double.MIN_VALUE + 1;
+                                upperBound = (long) Double.MIN_VALUE + extent;
                             }
                             if (lowerBound > Double.MAX_VALUE) {
-                                lowerBound = (long) Double.MAX_VALUE - 1;
+                                lowerBound = (long) Double.MAX_VALUE - extent;
                             }
                             else if (lowerBound < Double.MIN_VALUE) {
                                 lowerBound = (long) Double.MIN_VALUE;
