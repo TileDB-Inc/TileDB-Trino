@@ -45,7 +45,7 @@ public class TileDBColumnProperties
                 longProperty(
                         LowerBound,
                         "Domain Lower Bound",
-                        0L,
+                        Long.MIN_VALUE,
                         false),
                 longProperty(
                         UpperBound,
