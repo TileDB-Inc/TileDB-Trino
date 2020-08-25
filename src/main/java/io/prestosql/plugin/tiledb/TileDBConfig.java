@@ -41,6 +41,8 @@ public class TileDBConfig
 
     private String awsSecretAccessKey;
 
+    private String tileDBConfig;
+
     public Set<URI> getArrayURIs()
     {
         return arrayURIs;
@@ -64,6 +66,11 @@ public class TileDBConfig
     public String getAwsSecretAccessKey()
     {
         return awsSecretAccessKey;
+    }
+
+    public String getTileDBConfig()
+    {
+        return tileDBConfig;
     }
 
     @ConfigDescription("A comma separated list of array uris")
@@ -117,6 +124,14 @@ public class TileDBConfig
     public TileDBConfig setAwsSecretAccessKey(String awsSecretAccessKey)
     {
         this.awsSecretAccessKey = awsSecretAccessKey;
+        return this;
+    }
+
+    @ConfigDescription("TileDB config parameters in key1=value1,key2=value2 form")
+    @Config("tiledb-config")
+    public TileDBConfig setTileDBConfig(String tileDBConfig)
+    {
+        this.tileDBConfig = tileDBConfig;
         return this;
     }
 }

@@ -32,7 +32,8 @@ public class TestTileDBConfig
                 .setReadBufferSize(10485760)
                 .setWriteBufferSize(10485760)
                 .setAwsAccessKeyId(null)
-                .setAwsSecretAccessKey(null));
+                .setAwsSecretAccessKey(null)
+                .setTileDBConfig(null));
     }
 
     @Test
@@ -43,7 +44,8 @@ public class TestTileDBConfig
                 .put("read-buffer-size", "10")
                 .put("write-buffer-size", "100")
                 .put("aws-access-key-id", "")
-                .put("aws-secret-access-key", "").build();
+                .put("aws-secret-access-key", "")
+                .put("tiledb-config", "").build();
 
         TileDBConfig expected = null;
         expected = new TileDBConfig()
@@ -51,7 +53,8 @@ public class TestTileDBConfig
                 .setReadBufferSize(10)
                 .setWriteBufferSize(100)
                 .setAwsAccessKeyId("")
-                .setAwsSecretAccessKey("");
+                .setAwsSecretAccessKey("")
+                .setTileDBConfig("");
         assertFullMapping(properties, expected);
     }
 
@@ -63,7 +66,8 @@ public class TestTileDBConfig
                 .put("read-buffer-size", "1048576")
                 .put("write-buffer-size", "1048576")
                 .put("aws-access-key-id", "123")
-                .put("aws-secret-access-key", "abc").build();
+                .put("aws-secret-access-key", "abc")
+                .put("tiledb-config", "key1=value1,key2=value2").build();
 
         TileDBConfig expected = null;
         expected = new TileDBConfig()
@@ -71,7 +75,8 @@ public class TestTileDBConfig
                 .setReadBufferSize(1048576)
                 .setWriteBufferSize(1048576)
                 .setAwsAccessKeyId("123")
-                .setAwsSecretAccessKey("abc");
+                .setAwsSecretAccessKey("abc")
+                .setTileDBConfig("key1=value1,key2=value2");
         assertFullMapping(properties, expected);
     }
 }

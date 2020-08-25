@@ -31,11 +31,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CONFIG_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CONTEXT_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_DROP_TABLE_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getAwsAccessKeyId;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getAwsSecretAccessKey;
+import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getTileDBConfig;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -234,16 +236,35 @@ public class TileDBClient
     {
         Context localCtx = ctx;
         if (session != null) {
+            String configString = getTileDBConfig(session);
+            Config tileDBConfig = new Config();
+            boolean updateCtx = false;
+
+            // If the user set any tiledb config parameters, we will set them here
+            if (configString != null) {
+                for (String config : configString.split(",")) {
+                    String[] kv = config.split("=");
+                    if (kv.length != 2) {
+                        throw new PrestoException(TILEDB_CONFIG_ERROR, "invalid config for " + config);
+                    }
+                    tileDBConfig.set(kv[0], kv[1]);
+                    updateCtx = true;
+                }
+            }
+
+            // We'll deprecate the AWS Access Key parameters and remove in a future version
             String awsAccessKeyId = getAwsAccessKeyId(session);
             String awsSecretAccessKey = getAwsSecretAccessKey(session);
             if (awsAccessKeyId != null && !awsAccessKeyId.isEmpty()
                     && awsSecretAccessKey != null && !awsSecretAccessKey.isEmpty()) {
-                Config tileDBConfig = new Config();
                 tileDBConfig.set("vfs.s3.aws_access_key_id", awsAccessKeyId);
                 tileDBConfig.set("vfs.s3.aws_secret_access_key", awsSecretAccessKey);
-                localCtx = new Context(tileDBConfig);
-                tileDBConfig.close();
+                updateCtx = true;
             }
+            if (updateCtx) {
+                localCtx = new Context(tileDBConfig);
+            }
+            tileDBConfig.close();
         }
         return localCtx;
     }

@@ -34,6 +34,7 @@ public final class TileDBSessionProperties
     private static final String SPLITS = "splits";
     private static final String SPLIT_ONLY_PREDICATES = "split_only_predicates";
     private static final String ENABLE_STATS = "enable_stats";
+    private static final String TILEDB_CONFIG = "tiledb_config";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -75,6 +76,11 @@ public final class TileDBSessionProperties
                         ENABLE_STATS,
                         "Enable tiledb and connector stats per query",
                         false,
+                        false),
+                stringProperty(
+                        TILEDB_CONFIG,
+                        "TileDB config parameters in key1=value1,key2=value2 form",
+                        tileDBConfig.getTileDBConfig(),
                         false));
     }
 
@@ -116,5 +122,10 @@ public final class TileDBSessionProperties
     public static boolean getEnableStats(ConnectorSession session)
     {
         return session.getProperty(ENABLE_STATS, Boolean.class);
+    }
+
+    public static String getTileDBConfig(ConnectorSession session)
+    {
+        return session.getProperty(TILEDB_CONFIG, String.class);
     }
 }
