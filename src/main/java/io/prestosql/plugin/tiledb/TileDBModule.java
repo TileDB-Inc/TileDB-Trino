@@ -40,10 +40,13 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
+import static io.tiledb.java.api.Datatype.TILEDB_DATETIME_DAY;
+import static io.tiledb.java.api.Datatype.TILEDB_DATETIME_MS;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -125,6 +128,21 @@ public class TileDBModule
                 return REAL;
             case TILEDB_FLOAT64:
                 return DOUBLE;
+            case TILEDB_DATETIME_AS:
+            case TILEDB_DATETIME_FS:
+            case TILEDB_DATETIME_PS:
+            case TILEDB_DATETIME_NS:
+            case TILEDB_DATETIME_US:
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_SEC:
+            case TILEDB_DATETIME_MIN:
+            case TILEDB_DATETIME_HR:
+                return TIMESTAMP;
+            case TILEDB_DATETIME_DAY:
+            case TILEDB_DATETIME_WEEK:
+            case TILEDB_DATETIME_MONTH:
+            case TILEDB_DATETIME_YEAR:
+                return DATE;
             default:
                 //TODO: HANDLE ANY and other types
                 throw new TileDBError("Unknown type: " + type.toString());
@@ -158,7 +176,10 @@ public class TileDBModule
             return Datatype.TILEDB_FLOAT64;
         }
         else if (type.equals(DATE)) {
-            return Datatype.TILEDB_CHAR;
+            return TILEDB_DATETIME_DAY;
+        }
+        else if (type.equals(TIMESTAMP)) {
+            return Datatype.TILEDB_DATETIME_MS;
         }
         //TODO: HANDLE ANY and other types
         throw new TileDBError("Unknown type: " + type.toString());
@@ -204,6 +225,8 @@ public class TileDBModule
                 }
                 return new ArrayList<Integer>();
             }
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_DAY:
             case TILEDB_INT64: {
                 if (isVariableLength) {
                     return new ArrayList<long[]>();

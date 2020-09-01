@@ -38,6 +38,8 @@ import io.tiledb.java.api.TileDBError;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
+import java.sql.Timestamp;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_PAGE_SINK_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
@@ -58,6 +59,7 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
@@ -282,6 +284,16 @@ public class TileDBPageSink
 
         // Loop through each buffer to set it on query object
         for (Map.Entry<String, Pair<NativeArray, NativeArray>> bufferEntry : buffers.entrySet()) {
+            Datatype nativeType;
+            String name = bufferEntry.getKey();
+
+            if (array.getSchema().getDomain().hasDimension(name)) {
+                nativeType = array.getSchema().getDomain().getDimension(name).getType();
+            }
+            else {
+                nativeType = array.getSchema().getAttribute(name).getType();
+            }
+
             NativeArray offsets = bufferEntry.getValue().getFirst();
             NativeArray values = bufferEntry.getValue().getSecond();
             // LastValuePosition holds the position of the last element in the buffer
@@ -292,7 +304,7 @@ public class TileDBPageSink
                     values = new NativeArray(ctx, new String((byte[]) values.toJavaArray(toIntExact(effectiveElementInBuffer))), values.getJavaType());
                 }
                 else {
-                    values = new NativeArray(ctx, values.toJavaArray(toIntExact(effectiveElementInBuffer)), values.getJavaType());
+                    values = new NativeArray(ctx, values.toJavaArray(toIntExact(effectiveElementInBuffer)), nativeType);
                 }
                 buffersToClear.add(values);
             }
@@ -336,6 +348,16 @@ public class TileDBPageSink
             throw new TileDBError("Null values not allowed for insert. Error in table " + table.getTableName() + ", column " + columnHandles.get(channel).getColumnName() + ", row " + position);
         }
 
+        String colName = columnHandles.get(channel).getColumnName();
+        Datatype colType;
+
+        if (array.getSchema().getDomain().hasDimension(colName)) {
+            colType = array.getSchema().getDomain().getDimension(colName).getType();
+        }
+        else {
+            colType = array.getSchema().getAttribute(colName).getType();
+        }
+
         int size = 1;
         Type type = columnHandles.get(channel).getColumnType();
 
@@ -346,10 +368,6 @@ public class TileDBPageSink
         else if (VARBINARY.equals(type)) {
             size = type.getSlice(block, position).getBytes().length;
         }
-        else if (DATE.equals(type)) {
-            size = DATE_FORMATTER.print(TimeUnit.DAYS.toMillis(type.getLong(block, position))).length();
-        }
-
         // Check to see if we need to re-allocate array,this only happens for variable length attributes
         if (bufferPosition + size >= columnBuffer.getSize()) {
             throw new IndexOutOfBoundsException("Buffer outside of allocated memory");
@@ -386,8 +404,67 @@ public class TileDBPageSink
         else if (VARBINARY.equals(type)) {
             columnBuffer.setItem(bufferPosition, type.getSlice(block, position).getBytes());
         }
-        else if (DATE.equals(type)) { // NOTE: this is not used because we make all date columns a varchar type
-            columnBuffer.setItem(bufferPosition, DATE_FORMATTER.print(TimeUnit.DAYS.toMillis(type.getLong(block, position))));
+        else if (DATE.equals(type)) {
+            long value;
+            switch (colType) {
+                case TILEDB_DATETIME_AS: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) ((type.getLong(block, position)) * 0.0001)).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_FS: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) ((type.getLong(block, position)) * 0.001)).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_PS: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) ((type.getLong(block, position)) * 0.01)).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_NS: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_US: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((type.getLong(block, position)) * 1000).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_DAY:
+                case TILEDB_DATETIME_MS: {
+                    value = type.getLong(block, position);
+                    break;
+                }
+                case TILEDB_DATETIME_SEC: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusSeconds((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_MIN: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMinutes((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_HR: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusHours((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_WEEK: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusWeeks((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_MONTH: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMonths((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                case TILEDB_DATETIME_YEAR: {
+                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusYears((type.getLong(block, position))).toInstant().toEpochMilli();
+                    break;
+                }
+                default: {
+                    throw new TileDBError("Type: " + colType + " is not supported");
+                }
+            }
+
+            columnBuffer.setItem(bufferPosition, value);
+        }
+        else if (TIMESTAMP.equals(type)) {
+            columnBuffer.setItem(bufferPosition, type.getLong(block, position));
         }
         else {
             throw new PrestoException(TILEDB_PAGE_SINK_ERROR, "Unsupported column type: " + type.getDisplayName());

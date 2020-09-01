@@ -84,7 +84,6 @@ import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERR
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBModule.tileDBTypeFromPrestoType;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
-import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
@@ -452,7 +451,7 @@ public class TileDBMetadata
     }
 
     /**
-     * Create a array given a presto table layout/schema
+     * Create an array given a presto table layout/schema
      * @param tableMetadata metadata about table
      * @return Output table handler
      */
@@ -565,11 +564,24 @@ public class TileDBMetadata
                             }
                             domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.intValue(), upperBound.intValue()), extent.intValue()));
                             break;
+                        case TILEDB_DATETIME_AS:
+                        case TILEDB_DATETIME_FS:
+                        case TILEDB_DATETIME_PS:
+                        case TILEDB_DATETIME_NS:
+                        case TILEDB_DATETIME_US:
+                        case TILEDB_DATETIME_MS:
+                        case TILEDB_DATETIME_SEC:
+                        case TILEDB_DATETIME_MIN:
+                        case TILEDB_DATETIME_HR:
+                        case TILEDB_DATETIME_DAY:
+                        case TILEDB_DATETIME_WEEK:
+                        case TILEDB_DATETIME_MONTH:
+                        case TILEDB_DATETIME_YEAR:
                         case TILEDB_INT64:
                             if (upperBound > Long.MAX_VALUE - extent) {
                                 upperBound = (long) Long.MAX_VALUE - extent;
                             }
-                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound, upperBound), extent));
+                            domain.addDimension(new Dimension(localCtx, columnName, type, new Pair(lowerBound, upperBound), extent));
                             break;
                         case TILEDB_FLOAT32:
                             if (upperBound > Float.MAX_VALUE - extent) {
@@ -612,16 +624,13 @@ public class TileDBMetadata
                     }
                 }
                 else {
-                    Attribute attribute = new Attribute(localCtx, columnName, classType);
+                    Attribute attribute = new Attribute(localCtx, columnName, type);
                     if (isVarcharType(column.getType())) {
                         VarcharType varcharType = (VarcharType) column.getType();
                         Optional<Integer> len = varcharType.getLength();
                         if (varcharType.isUnbounded() || (len.isPresent() && len.get() > 1)) {
                             attribute.setCellValNum(TILEDB_VAR_NUM);
                         }
-                    }
-                    else if (column.getType().equals(DATE)) {
-                        attribute.setCellValNum(TILEDB_VAR_NUM);
                     }
                     arraySchema.addAttribute(attribute);
                 }

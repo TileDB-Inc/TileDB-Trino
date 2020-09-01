@@ -41,6 +41,8 @@ import org.apache.commons.beanutils.ConvertUtils;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -544,6 +546,19 @@ public class TileDBRecordCursor
                 return (short) a < (short) b ? a : b;
             case TILEDB_INT32:
                 return (int) a < (int) b ? a : b;
+            case TILEDB_DATETIME_AS:
+            case TILEDB_DATETIME_FS:
+            case TILEDB_DATETIME_PS:
+            case TILEDB_DATETIME_NS:
+            case TILEDB_DATETIME_US:
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_SEC:
+            case TILEDB_DATETIME_MIN:
+            case TILEDB_DATETIME_HR:
+            case TILEDB_DATETIME_DAY:
+            case TILEDB_DATETIME_WEEK:
+            case TILEDB_DATETIME_MONTH:
+            case TILEDB_DATETIME_YEAR:
             case TILEDB_INT64:
                 return (long) a < (long) b ? a : b;
             case TILEDB_UINT8:
@@ -577,6 +592,19 @@ public class TileDBRecordCursor
                 return (short) a > (short) b ? a : b;
             case TILEDB_INT32:
                 return (int) a > (int) b ? a : b;
+            case TILEDB_DATETIME_AS:
+            case TILEDB_DATETIME_FS:
+            case TILEDB_DATETIME_PS:
+            case TILEDB_DATETIME_NS:
+            case TILEDB_DATETIME_US:
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_SEC:
+            case TILEDB_DATETIME_MIN:
+            case TILEDB_DATETIME_HR:
+            case TILEDB_DATETIME_DAY:
+            case TILEDB_DATETIME_WEEK:
+            case TILEDB_DATETIME_MONTH:
+            case TILEDB_DATETIME_YEAR:
             case TILEDB_INT64:
                 return (long) a > (long) b ? a : b;
             case TILEDB_UINT8:
@@ -607,6 +635,19 @@ public class TileDBRecordCursor
                 return ((short) value) < Short.MAX_VALUE ? ((short) value + 1) : value;
             case TILEDB_INT32:
                 return ((int) value) < Integer.MAX_VALUE ? ((int) value + 1) : value;
+            case TILEDB_DATETIME_AS:
+            case TILEDB_DATETIME_FS:
+            case TILEDB_DATETIME_PS:
+            case TILEDB_DATETIME_NS:
+            case TILEDB_DATETIME_US:
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_SEC:
+            case TILEDB_DATETIME_MIN:
+            case TILEDB_DATETIME_HR:
+            case TILEDB_DATETIME_DAY:
+            case TILEDB_DATETIME_WEEK:
+            case TILEDB_DATETIME_MONTH:
+            case TILEDB_DATETIME_YEAR:
             case TILEDB_INT64:
                 return ((long) value) < Long.MAX_VALUE ? ((long) value + 1) : value;
             case TILEDB_UINT8:
@@ -647,6 +688,19 @@ public class TileDBRecordCursor
                 return ((int) value) > ((int) Short.MIN_VALUE - 1) ? ((int) value - 1) : value;
             case TILEDB_UINT32:
                 return ((long) value) > ((long) Integer.MIN_VALUE - 1) ? ((long) value - 1) : value;
+            case TILEDB_DATETIME_AS:
+            case TILEDB_DATETIME_FS:
+            case TILEDB_DATETIME_PS:
+            case TILEDB_DATETIME_NS:
+            case TILEDB_DATETIME_US:
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_SEC:
+            case TILEDB_DATETIME_MIN:
+            case TILEDB_DATETIME_HR:
+            case TILEDB_DATETIME_DAY:
+            case TILEDB_DATETIME_WEEK:
+            case TILEDB_DATETIME_MONTH:
+            case TILEDB_DATETIME_YEAR:
             case TILEDB_UINT64:
                 return ((long) value) > ((long) Integer.MIN_VALUE - 1) ? ((long) value - 1) : value;
             case TILEDB_FLOAT32:
@@ -953,6 +1007,52 @@ public class TileDBRecordCursor
                 value = (long) ((int[]) fieldArray)[index];
                 break;
             }
+            case TILEDB_DATETIME_AS: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) (((long[]) fieldArray)[index] * 0.0001)).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_FS: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) (((long[]) fieldArray)[index] * 0.001)).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_PS: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) (((long[]) fieldArray)[index] * 0.01)).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_NS: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_US: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos(((long[]) fieldArray)[index] * 1000).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_SEC: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusSeconds(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_MIN: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMinutes(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_HR: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusHours(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_WEEK: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusWeeks(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_MONTH: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMonths(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_YEAR: {
+                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusYears(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                break;
+            }
+            case TILEDB_DATETIME_MS:
+            case TILEDB_DATETIME_DAY:
             case TILEDB_UINT32:
             case TILEDB_UINT64:
             case TILEDB_INT64: {
@@ -964,6 +1064,8 @@ public class TileDBRecordCursor
                 value = ((Integer) floatToRawIntBits(((float[]) fieldArray)[index])).longValue();
                 break;
             }
+            default:
+                LOG.error("Unsupported type: " + datatype + " returning: " + value);
         }
 
         recordFunctionTime("getLong", timer);

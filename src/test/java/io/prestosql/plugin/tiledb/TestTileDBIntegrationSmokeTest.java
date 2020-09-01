@@ -44,11 +44,6 @@ public class TestTileDBIntegrationSmokeTest
         }
     }
 
-    protected boolean isDateTypeSupported()
-    {
-        return false;
-    }
-
     protected boolean isParameterizedVarcharSupported()
     {
         return false;
@@ -58,7 +53,7 @@ public class TestTileDBIntegrationSmokeTest
     public void testDescribeTable()
     {
         MaterializedResult actualColumns = computeActual("DESC orders").toTestTypes();
-        assertEquals(actualColumns, getExpectedOrdersTableDescription(isDateTypeSupported(), isParameterizedVarcharSupported()));
+        assertEquals(actualColumns, getExpectedOrdersTableDescription(isParameterizedVarcharSupported()));
     }
 
     @AfterClass(alwaysRun = true)
@@ -74,22 +69,15 @@ public class TestTileDBIntegrationSmokeTest
         }
     }
 
-    private MaterializedResult getExpectedOrdersTableDescription(boolean dateSupported, boolean parametrizedVarchar)
+    private MaterializedResult getExpectedOrdersTableDescription(boolean parametrizedVarchar)
     {
-        String orderDateType;
-        if (dateSupported) {
-            orderDateType = "date";
-        }
-        else {
-            orderDateType = "varchar";
-        }
         if (parametrizedVarchar) {
             return MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                     .row("orderkey", "bigint", "", "Dimension")
                     .row("custkey", "bigint", "", "Dimension")
                     .row("orderstatus", "varchar(1)", "", "Attribute")
                     .row("totalprice", "double", "", "Attribute")
-                    .row("orderdate", orderDateType, "", "Attribute")
+                    .row("orderdate", "date", "", "Attribute")
                     .row("orderpriority", "varchar(15)", "", "Attribute")
                     .row("clerk", "varchar(15)", "", "Attribute")
                     .row("shippriority", "integer", "", "Attribute")
@@ -102,7 +90,7 @@ public class TestTileDBIntegrationSmokeTest
                     .row("custkey", "bigint", "", "Dimension")
                     .row("orderstatus", "varchar(1)", "", "Attribute")
                     .row("totalprice", "double", "", "Attribute")
-                    .row("orderdate", orderDateType, "", "Attribute")
+                    .row("orderdate", "date", "", "Attribute")
                     .row("orderpriority", "varchar", "", "Attribute")
                     .row("clerk", "varchar", "", "Attribute")
                     .row("shippriority", "integer", "", "Attribute")
