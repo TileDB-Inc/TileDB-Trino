@@ -19,22 +19,41 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
 import io.prestosql.tests.AbstractTestQueryFramework;
+import io.tiledb.java.api.Array;
+import io.tiledb.java.api.ArraySchema;
+import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
+import io.tiledb.java.api.Datatype;
+import io.tiledb.java.api.Dimension;
+import io.tiledb.java.api.Domain;
+import io.tiledb.java.api.Pair;
+import io.tiledb.java.api.Query;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBQueryRunner.createTileDBQueryRunner;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
+import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
+import static io.tiledb.java.api.Layout.TILEDB_ROW_MAJOR;
+import static io.tiledb.java.api.QueryType.TILEDB_WRITE;
 import static java.lang.String.format;
 
 @Test(singleThreaded = true)
@@ -210,6 +229,108 @@ public class TestTileDBQueries
                 .row((int) 3, 13)
                 .row((int) 5, 15)
                 .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorTimestamp()
+    {
+        // Integer
+        String arrayName = "test_create_timestamp";
+        dropArray(arrayName);
+        create1DVectorTimestampDimension(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "timestamp", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .build());
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(timestamp '2012-10-10 10:00', 10), (timestamp '2012-11-10 10:00', 13), (timestamp '2012-12-10 10:00', 15)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TIMESTAMP, INTEGER)
+                .row(LocalDateTime.of(2012, 10, 10, 10, 0, 0), 10)
+                .row(LocalDateTime.of(2012, 11, 10, 10, 0, 0), 13)
+                .row(LocalDateTime.of(2012, 12, 10, 10, 0, 0), 15)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x > timestamp '2012-11-10 10:00' ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TIMESTAMP, INTEGER)
+                .row(LocalDateTime.of(2012, 12, 10, 10, 0, 0), 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorDate()
+    {
+        // Integer
+        String arrayName = "test_create_date";
+        dropArray(arrayName);
+        create1DVectorDateDimension(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "date", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .build());
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(date '2012-10-10', 10), (date '2012-11-10', 13), (date '2012-12-10', 15)", arrayName);
+
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), DATE, INTEGER)
+                .row(LocalDate.of(2012, 10, 10), 10)
+                .row(LocalDate.of(2012, 11, 10), 13)
+                .row(LocalDate.of(2012, 12, 10), 15)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x > date '2012-11-10' ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), DATE, INTEGER)
+                .row(LocalDate.of(2012, 12, 10), 15)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorYear() throws Exception
+    {
+        // Integer
+        String arrayName = "test_create_year";
+        dropArray(arrayName);
+        createYearArray(arrayName);
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("d1", "integer", "", "Dimension")
+                        .row("ms", "timestamp", "", "Attribute")
+                        .row("sec", "timestamp", "", "Attribute")
+                        .row("min", "timestamp", "", "Attribute")
+                        .row("hour", "timestamp", "", "Attribute")
+                        .row("day", "date", "", "Attribute")
+                        .row("week", "date", "", "Attribute")
+                        .row("month", "date", "", "Attribute")
+                        .row("year", "date", "", "Attribute")
+                        .build());
 
         dropArray(arrayName);
     }
@@ -583,6 +704,26 @@ public class TestTileDBQueries
         queryRunner.execute(createSql);
     }
 
+    private void create1DVectorTimestampDimension(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x timestamp WITH (dimension=true), " +
+                "a1 integer" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorDateDimension(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x date WITH (dimension=true), " +
+                "a1 integer" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
     private void create1DVectorRealDimension(String arrayName)
     {
         QueryRunner queryRunner = getQueryRunner();
@@ -648,6 +789,107 @@ public class TestTileDBQueries
         }
         catch (Exception e) {
             // Do nothing
+        }
+    }
+
+    private void createYearArray(String arrayName) throws TileDBError
+    {
+        removeArrayIfExists(arrayName);
+        // Create dimensions
+        Dimension d1 =
+                new Dimension(ctx, "d1", Datatype.TILEDB_INT32, new Pair(0, 3), 4);
+
+        // Create domain
+        Domain domain = new Domain(ctx);
+        domain.addDimension(d1);
+
+        // Create attribute
+        Attribute ms = new Attribute(ctx, "ms", Datatype.TILEDB_DATETIME_MS);
+        Attribute sec = new Attribute(ctx, "sec", Datatype.TILEDB_DATETIME_MS);
+        Attribute min = new Attribute(ctx, "min", Datatype.TILEDB_DATETIME_MIN);
+        Attribute hour = new Attribute(ctx, "hour", Datatype.TILEDB_DATETIME_HR);
+        Attribute day = new Attribute(ctx, "day", Datatype.TILEDB_DATETIME_DAY);
+        Attribute week = new Attribute(ctx, "week", Datatype.TILEDB_DATETIME_WEEK);
+        Attribute month = new Attribute(ctx, "month", Datatype.TILEDB_DATETIME_MONTH);
+        Attribute year = new Attribute(ctx, "year", Datatype.TILEDB_DATETIME_YEAR);
+
+        // Create schema
+        ArraySchema schema = new ArraySchema(ctx, TILEDB_DENSE);
+        schema.setDomain(domain);
+        schema.addAttribute(ms);
+        schema.addAttribute(sec);
+        schema.addAttribute(min);
+        schema.addAttribute(hour);
+        schema.addAttribute(day);
+        schema.addAttribute(week);
+        schema.addAttribute(month);
+        schema.addAttribute(year);
+
+        Array.create(arrayName, schema);
+
+        ByteBuffer msBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        msBuffer.putLong(Timestamp.valueOf(LocalDate.of(2012, 10, 10).atStartOfDay()).toInstant().toEpochMilli());
+        msBuffer.putLong(Timestamp.valueOf(LocalDate.of(2015, 10, 10).atStartOfDay()).toInstant().toEpochMilli());
+        msBuffer.putLong(Timestamp.valueOf(LocalDate.of(2017, 10, 10).atStartOfDay()).toInstant().toEpochMilli());
+        msBuffer.putLong(Timestamp.valueOf(LocalDate.of(2020, 10, 10).atStartOfDay()).toInstant().toEpochMilli());
+
+        ByteBuffer secBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        secBuffer.putLong(60L);
+        secBuffer.putLong(120L);
+        secBuffer.putLong(180L);
+        secBuffer.putLong(240L);
+
+        ByteBuffer minBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        minBuffer.putLong(60L);
+        minBuffer.putLong(120L);
+        minBuffer.putLong(180L);
+        minBuffer.putLong(240L);
+
+        ByteBuffer hourBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        hourBuffer.putLong(60L);
+        hourBuffer.putLong(120L);
+        hourBuffer.putLong(180L);
+        hourBuffer.putLong(240L);
+
+        ByteBuffer dayBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        dayBuffer.putLong(60L);
+        dayBuffer.putLong(120L);
+        dayBuffer.putLong(180L);
+        dayBuffer.putLong(240L);
+
+        ByteBuffer weekBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        weekBuffer.putLong(60L);
+        weekBuffer.putLong(120L);
+        weekBuffer.putLong(180L);
+        weekBuffer.putLong(240L);
+
+        ByteBuffer monthBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        monthBuffer.putLong(60L);
+        monthBuffer.putLong(120L);
+        monthBuffer.putLong(180L);
+        monthBuffer.putLong(240L);
+
+        ByteBuffer yearsBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder());
+        yearsBuffer.putLong(20L);
+        yearsBuffer.putLong(30L);
+        yearsBuffer.putLong(40L);
+        yearsBuffer.putLong(50L);
+
+        Array array = new Array(ctx, arrayName, TILEDB_WRITE);
+
+        try (Query query = new Query(array, TILEDB_WRITE)) {
+            query
+                    .setLayout(TILEDB_ROW_MAJOR)
+                    .setBuffer("ms", msBuffer)
+                    .setBuffer("sec", msBuffer)
+                    .setBuffer("min", secBuffer)
+                    .setBuffer("hour", hourBuffer)
+                    .setBuffer("day", dayBuffer)
+                    .setBuffer("week", weekBuffer)
+                    .setBuffer("month", monthBuffer)
+                    .setBuffer("year", yearsBuffer);
+            // Submit query
+            query.submit();
         }
     }
 }
