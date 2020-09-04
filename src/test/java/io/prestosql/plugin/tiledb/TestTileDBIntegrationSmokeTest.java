@@ -15,8 +15,9 @@ package io.prestosql.plugin.tiledb;
 
 import io.airlift.tpch.TpchTable;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.testing.AbstractTestIntegrationSmokeTest;
 import io.prestosql.testing.MaterializedResult;
-import io.prestosql.tests.AbstractTestIntegrationSmokeTest;
+import io.prestosql.testing.QueryRunner;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.TileDBError;
 import org.testng.annotations.AfterClass;
@@ -35,7 +36,7 @@ public class TestTileDBIntegrationSmokeTest
 
     public TestTileDBIntegrationSmokeTest()
     {
-        super(TileDBQueryRunner::createTileDBQueryRunner);
+        super();
         try {
             ctx = new Context();
         }
@@ -47,6 +48,12 @@ public class TestTileDBIntegrationSmokeTest
     protected boolean isParameterizedVarcharSupported()
     {
         return false;
+    }
+
+    @Override
+    protected QueryRunner createQueryRunner() throws Exception
+    {
+        return TileDBQueryRunner.createTileDBQueryRunner();
     }
 
     @Test

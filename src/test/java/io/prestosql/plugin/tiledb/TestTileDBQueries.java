@@ -13,12 +13,10 @@
  */
 package io.prestosql.plugin.tiledb;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.testing.AbstractTestQueryFramework;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
-import io.prestosql.tests.AbstractTestQueryFramework;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
@@ -64,13 +62,19 @@ public class TestTileDBQueries
 
     public TestTileDBQueries()
     {
-        super(() -> createTileDBQueryRunner(ImmutableList.of(), ImmutableMap.of(), new Context()));
+        super();
         try {
             ctx = new Context();
         }
         catch (TileDBError tileDBError) {
             throw new PrestoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
         }
+    }
+
+    @Override
+    protected QueryRunner createQueryRunner() throws Exception
+    {
+        return createTileDBQueryRunner();
     }
 
     @AfterClass(alwaysRun = true)
