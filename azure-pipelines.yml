@@ -1,0 +1,29 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+      - master
+      - release-*
+  tags:
+    include:
+      - "*"
+
+stages:
+  - stage: CI
+    condition: not(startsWith(variables['Build.SourceBranch'], 'refs/tags'))
+    jobs:
+      - job: Linux_OSX
+        strategy:
+          matrix:
+            ubuntu_18:
+              imageName: 'ubuntu-18.04'
+            macOS:
+              imageName: 'macOS-10.14'
+        pool:
+          vmImage: $(imageName)
+        steps:
+          - template: ci/tiledb-presto-linux_osx.yml
