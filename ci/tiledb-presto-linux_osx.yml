@@ -1,0 +1,38 @@
+steps:
+  - bash: |
+      unset SYSTEM
+      set -e pipefail
+      open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg
+      sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -allowUntrusted -target /
+    condition: eq(variables['Agent.OS'], 'Darwin')
+    displayName: 'Install system headers (OSX only)'
+
+
+  - bash: |
+      unset SYSTEM
+      mvn checkstyle:checkstyle
+    displayName: 'Check Style'
+
+  - bash: |
+      unset SYSTEM
+      mvn clean package -DskipTests
+    displayName: 'Package'
+
+  - bash: |
+      unset SYSTEM
+      mvn test
+    displayName: 'Test'
+
+  - bash: |
+      set -e pipefail
+      # Display log files if the build failed
+      echo "Dumping log files for failed build"
+      echo "----------------------------------"
+      for f in $(find $BUILD_REPOSITORY_LOCALPATH -name *.dumpstream);
+        do echo "------"
+           echo $f
+           echo "======"
+           cat $f
+        done;
+    condition: failed() # only run this job if the build step failed
+    displayName: "Print log files (failed build only)"
