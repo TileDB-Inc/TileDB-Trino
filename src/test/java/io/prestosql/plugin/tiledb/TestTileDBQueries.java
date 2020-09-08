@@ -249,7 +249,7 @@ public class TestTileDBQueries
 
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
-                        .row("x", "timestamp", "", "Dimension")
+                        .row("x", "timestamp(3)", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
@@ -326,10 +326,10 @@ public class TestTileDBQueries
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("d1", "integer", "", "Dimension")
-                        .row("ms", "timestamp", "", "Attribute")
-                        .row("sec", "timestamp", "", "Attribute")
-                        .row("min", "timestamp", "", "Attribute")
-                        .row("hour", "timestamp", "", "Attribute")
+                        .row("ms", "timestamp(3)", "", "Attribute")
+                        .row("sec", "timestamp(3)", "", "Attribute")
+                        .row("min", "timestamp(3)", "", "Attribute")
+                        .row("hour", "timestamp(3)", "", "Attribute")
                         .row("day", "date", "", "Attribute")
                         .row("week", "date", "", "Attribute")
                         .row("month", "date", "", "Attribute")

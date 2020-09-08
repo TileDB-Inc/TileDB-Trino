@@ -27,6 +27,7 @@ import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static io.tiledb.java.api.TileDBObject.remove;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @Test
 public class TestTileDBIntegrationSmokeTest
@@ -61,6 +62,24 @@ public class TestTileDBIntegrationSmokeTest
     {
         MaterializedResult actualColumns = computeActual("DESC orders").toTestTypes();
         assertEquals(actualColumns, getExpectedOrdersTableDescription(isParameterizedVarcharSupported()));
+    }
+
+    @Test
+    public void testShowCreateTable()
+    {
+        assertThat((String) computeActual("SHOW CREATE TABLE orders").getOnlyValue())
+                // If the connector reports additional column properties, the expected value needs to be adjusted in the test subclass
+                .matches("CREATE TABLE tiledb.tiledb.orders \\Q(\n" +
+                        "   orderkey bigint COMMENT 'Dimension',\n" +
+                        "   custkey bigint COMMENT 'Dimension',\n" +
+                        "   orderstatus varchar(1) COMMENT 'Attribute',\n" +
+                        "   totalprice double COMMENT 'Attribute',\n" +
+                        "   orderdate date COMMENT 'Attribute',\n" +
+                        "   orderpriority varchar COMMENT 'Attribute',\n" +
+                        "   clerk varchar COMMENT 'Attribute',\n" +
+                        "   shippriority integer COMMENT 'Attribute',\n" +
+                        "   comment varchar COMMENT 'Attribute'\n" +
+                        ")");
     }
 
     @AfterClass(alwaysRun = true)
