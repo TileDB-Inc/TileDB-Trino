@@ -222,6 +222,13 @@ public class TileDBSplitManager
                 maxFromNonEmptyDomain = false;
             }
 
+            // If min is less than max, then this range cannot be split, as it returns zero records
+            // This can happen if the query has a selection that puts an upper bound that is less than the
+            // low bound, for example, SELECT * FROM ORDERS WHERE orderkey < 0
+            if (min > max) {
+                return ranges;
+            }
+
             long rangeLength = (max - min) / buckets;
             long leftOvers = (max - min) % buckets;
 
