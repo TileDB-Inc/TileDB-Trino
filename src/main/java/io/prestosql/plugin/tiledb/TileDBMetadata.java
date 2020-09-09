@@ -316,7 +316,12 @@ public class TileDBMetadata
         if (prefix.getSchema().isPresent()) {
             return listTables(session, prefix.getSchema());
         }
-        return ImmutableList.of(new SchemaTableName(prefix.getSchema().get(), prefix.getTable().get()));
+        if (prefix.getSchema().isPresent() && prefix.getTable().isPresent()) {
+            return ImmutableList.of(new SchemaTableName(prefix.getSchema().get(), prefix.getTable().get()));
+        }
+        else {
+            return Collections.emptyList();
+        }
     }
 
     @Override
