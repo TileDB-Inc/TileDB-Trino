@@ -175,7 +175,7 @@ public final class TileDBQueryRunner
                         "    shipmode varchar(10),\n" +
                         "    comment varchar(44)\n" +
                         " ) WITH (uri = '%s')", target, target);
-                insertSQL = format("INSERT INTO %s (orderkey, partkey, suppkey, linenumber, quantity, extendedprice, discount, tax, returnflag, linestatus, shipdate, commitdate, receiptdate, shipinstruct, shipmode, comment) SELECT orderkey, partkey, suppkey, linenumber, quantity, extendedprice, discount, tax, returnflag, linestatus, cast(shipdate as varchar), cast(commitdate as varchar), cast(receiptdate as varchar), shipinstruct, shipmode, comment FROM %s", target, source);
+                insertSQL = format("INSERT INTO %s (orderkey, partkey, suppkey, linenumber, quantity, extendedprice, discount, tax, returnflag, linestatus, shipdate, commitdate, receiptdate, shipinstruct, shipmode, comment) SELECT orderkey, partkey, suppkey, linenumber, quantity, extendedprice, discount, tax, returnflag, linestatus, shipdate, commitdate, receiptdate, shipinstruct, shipmode, comment FROM %s", target, source);
                 break;
             case "nation":
                 createSQL = format("CREATE TABLE %s(\n" +
@@ -198,7 +198,7 @@ public final class TileDBQueryRunner
                         "    shippriority integer,\n" +
                         "    comment varchar(79)\n" +
                         " ) WITH (uri = '%s')", target, target);
-                insertSQL = format("INSERT INTO %s (orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment) SELECT orderkey, custkey, orderstatus, totalprice, cast(orderdate AS varchar), orderpriority, clerk, shippriority, comment FROM %s", target, source);
+                insertSQL = format("INSERT INTO %s (orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment) SELECT orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment FROM %s", target, source);
                 break;
             case "part":
                 createSQL = format("CREATE TABLE %s(\n" +
