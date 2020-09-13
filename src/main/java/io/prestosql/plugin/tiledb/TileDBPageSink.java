@@ -362,6 +362,7 @@ public class TileDBPageSink
             else {
                 colType = array.getSchema().getAttribute(colName).getType();
             }
+            channelToDatatype.put(channel, colType);
         }
 
         int size = 1;
