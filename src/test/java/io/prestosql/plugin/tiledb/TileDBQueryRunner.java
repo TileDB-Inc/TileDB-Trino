@@ -118,6 +118,10 @@ public final class TileDBQueryRunner
         for (TpchTable<?> table : tables) {
             // Build test tables if they do not exist. Normally we should always rebuild them but for testing
             // it is helpful to not destroy them
+
+            if (!table.getTableName().equals("lineitem")) {
+                continue;
+            }
             if (!(new File(table.getTableName())).exists() || !exists(ctx, table.getTableName())) {
                 copyTable(queryRunner, sourceCatalog, session, sourceSchema, table);
             }
