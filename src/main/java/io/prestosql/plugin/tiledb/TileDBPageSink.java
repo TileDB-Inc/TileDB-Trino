@@ -75,6 +75,7 @@ public class TileDBPageSink
 {
     private static final DateTimeFormatter DATE_FORMATTER = ISODateTimeFormat.date().withZoneUTC();
     private static final Logger log = Logger.get(TileDBPageSink.class);
+    private static final Map<Integer, Datatype> channelToDatatype = new HashMap<>();
 
     private Query query;
     private final Array array;
@@ -351,11 +352,16 @@ public class TileDBPageSink
         String colName = columnHandles.get(channel).getColumnName();
         Datatype colType;
 
-        if (array.getSchema().getDomain().hasDimension(colName)) {
-            colType = array.getSchema().getDomain().getDimension(colName).getType();
+        if (channelToDatatype.containsKey(channel)) {
+            colType = channelToDatatype.get(channel);
         }
         else {
-            colType = array.getSchema().getAttribute(colName).getType();
+            if (array.getSchema().getDomain().hasDimension(colName)) {
+                colType = array.getSchema().getDomain().getDimension(colName).getType();
+            }
+            else {
+                colType = array.getSchema().getAttribute(colName).getType();
+            }
         }
 
         int size = 1;
