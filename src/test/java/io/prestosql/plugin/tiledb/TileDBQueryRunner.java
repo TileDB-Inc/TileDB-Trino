@@ -20,8 +20,8 @@ import io.airlift.tpch.TpchTable;
 import io.prestosql.Session;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.plugin.tpch.TpchPlugin;
+import io.prestosql.testing.DistributedQueryRunner;
 import io.prestosql.testing.QueryRunner;
-import io.prestosql.tests.DistributedQueryRunner;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.TileDBError;
 import org.intellij.lang.annotations.Language;
@@ -65,8 +65,7 @@ public final class TileDBQueryRunner
                 .setSchema("tiledb")
                 .build();
 
-        DistributedQueryRunner queryRunner = new DistributedQueryRunner(session, 4, extraProperties);
-
+        DistributedQueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(4).setExtraProperties(extraProperties).build();
         try {
             List<String> existingTables = new ArrayList<>();
             List<TpchTable<?>> tablesToCopy = new ArrayList<>();

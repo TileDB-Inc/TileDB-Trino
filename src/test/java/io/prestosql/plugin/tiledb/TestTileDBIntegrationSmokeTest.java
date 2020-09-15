@@ -15,8 +15,9 @@ package io.prestosql.plugin.tiledb;
 
 import io.airlift.tpch.TpchTable;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.testing.AbstractTestIntegrationSmokeTest;
 import io.prestosql.testing.MaterializedResult;
-import io.prestosql.tests.AbstractTestIntegrationSmokeTest;
+import io.prestosql.testing.QueryRunner;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.TileDBError;
 import org.testng.annotations.AfterClass;
@@ -26,6 +27,7 @@ import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static io.tiledb.java.api.TileDBObject.remove;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @Test
 public class TestTileDBIntegrationSmokeTest
@@ -35,7 +37,7 @@ public class TestTileDBIntegrationSmokeTest
 
     public TestTileDBIntegrationSmokeTest()
     {
-        super(TileDBQueryRunner::createTileDBQueryRunner);
+        super();
         try {
             ctx = new Context();
         }
@@ -49,11 +51,35 @@ public class TestTileDBIntegrationSmokeTest
         return false;
     }
 
+    @Override
+    protected QueryRunner createQueryRunner() throws Exception
+    {
+        return TileDBQueryRunner.createTileDBQueryRunner();
+    }
+
     @Test
     public void testDescribeTable()
     {
         MaterializedResult actualColumns = computeActual("DESC orders").toTestTypes();
         assertEquals(actualColumns, getExpectedOrdersTableDescription(isParameterizedVarcharSupported()));
+    }
+
+    @Test
+    public void testShowCreateTable()
+    {
+        assertThat((String) computeActual("SHOW CREATE TABLE orders").getOnlyValue())
+                // If the connector reports additional column properties, the expected value needs to be adjusted in the test subclass
+                .matches("CREATE TABLE tiledb.tiledb.orders \\Q(\n" +
+                        "   orderkey bigint COMMENT 'Dimension',\n" +
+                        "   custkey bigint COMMENT 'Dimension',\n" +
+                        "   orderstatus varchar(1) COMMENT 'Attribute',\n" +
+                        "   totalprice double COMMENT 'Attribute',\n" +
+                        "   orderdate date COMMENT 'Attribute',\n" +
+                        "   orderpriority varchar COMMENT 'Attribute',\n" +
+                        "   clerk varchar COMMENT 'Attribute',\n" +
+                        "   shippriority integer COMMENT 'Attribute',\n" +
+                        "   comment varchar COMMENT 'Attribute'\n" +
+                        ")");
     }
 
     @AfterClass(alwaysRun = true)

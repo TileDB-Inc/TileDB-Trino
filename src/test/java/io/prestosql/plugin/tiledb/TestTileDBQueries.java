@@ -13,12 +13,10 @@
  */
 package io.prestosql.plugin.tiledb;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.testing.AbstractTestQueryFramework;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
-import io.prestosql.tests.AbstractTestQueryFramework;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
@@ -64,13 +62,19 @@ public class TestTileDBQueries
 
     public TestTileDBQueries()
     {
-        super(() -> createTileDBQueryRunner(ImmutableList.of(), ImmutableMap.of(), new Context()));
+        super();
         try {
             ctx = new Context();
         }
         catch (TileDBError tileDBError) {
             throw new PrestoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
         }
+    }
+
+    @Override
+    protected QueryRunner createQueryRunner() throws Exception
+    {
+        return createTileDBQueryRunner();
     }
 
     @AfterClass(alwaysRun = true)
@@ -245,7 +249,7 @@ public class TestTileDBQueries
 
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
-                        .row("x", "timestamp", "", "Dimension")
+                        .row("x", "timestamp(3)", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
                         .build());
 
@@ -322,10 +326,10 @@ public class TestTileDBQueries
         assertEquals(desc,
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("d1", "integer", "", "Dimension")
-                        .row("ms", "timestamp", "", "Attribute")
-                        .row("sec", "timestamp", "", "Attribute")
-                        .row("min", "timestamp", "", "Attribute")
-                        .row("hour", "timestamp", "", "Attribute")
+                        .row("ms", "timestamp(3)", "", "Attribute")
+                        .row("sec", "timestamp(3)", "", "Attribute")
+                        .row("min", "timestamp(3)", "", "Attribute")
+                        .row("hour", "timestamp(3)", "", "Attribute")
                         .row("day", "date", "", "Attribute")
                         .row("week", "date", "", "Attribute")
                         .row("month", "date", "", "Attribute")

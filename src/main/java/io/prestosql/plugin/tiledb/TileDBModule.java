@@ -20,6 +20,7 @@ import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarbinaryType;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.TileDBError;
@@ -42,11 +43,9 @@ import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.Datatype.TILEDB_DATETIME_DAY;
-import static io.tiledb.java.api.Datatype.TILEDB_DATETIME_MS;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -99,7 +98,7 @@ public class TileDBModule
         @Override
         protected Type _deserialize(String value, DeserializationContext context)
         {
-            return typeManager.getType(parseTypeSignature(value));
+            return typeManager.getType(new TypeSignature(value));
         }
     }
 
