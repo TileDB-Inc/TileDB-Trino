@@ -10,16 +10,19 @@ steps:
 
   - bash: |
       unset SYSTEM
+      export JAVA_HOME=$JAVA_HOME_11_X64
       mvn checkstyle:checkstyle
     displayName: 'Check Style'
 
   - bash: |
       unset SYSTEM
+      export JAVA_HOME=$JAVA_HOME_11_X64
       mvn clean package -DskipTests
     displayName: 'Package'
 
   - bash: |
       unset SYSTEM
+      export JAVA_HOME=$JAVA_HOME_11_X64
       mvn test
     displayName: 'Test'
 
