@@ -272,6 +272,8 @@ public class TestTileDBQueries
                 .row(LocalDateTime.of(2012, 12, 10, 10, 0, 0), 15)
                 .build());
 
+        MaterializedResult r = computeActual("SELECT * FROM " + arrayName);
+
         dropArray(arrayName);
     }
 
@@ -311,6 +313,8 @@ public class TestTileDBQueries
                 .row(LocalDate.of(2012, 12, 10), 15)
                 .build());
 
+        MaterializedResult r = computeActual("SELECT * FROM " + arrayName);
+
         dropArray(arrayName);
     }
 
@@ -335,6 +339,7 @@ public class TestTileDBQueries
                         .row("month", "date", "", "Attribute")
                         .row("year", "date", "", "Attribute")
                         .build());
+        MaterializedResult r = computeActual("SELECT * FROM " + arrayName);
 
         dropArray(arrayName);
     }

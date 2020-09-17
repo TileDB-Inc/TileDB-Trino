@@ -39,7 +39,9 @@ import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -88,6 +90,8 @@ public class TileDBPageSink
 
     private final TileDBOutputTableHandle table;
     private final int maxBufferSize; // Max Buffer
+
+    private static final OffsetDateTime zeroDateTime = new Timestamp(0).toLocalDateTime().atOffset(ZoneOffset.UTC);
 
     /**
      * Initialize an instance of page sink preparing for inserts
@@ -344,6 +348,7 @@ public class TileDBPageSink
      */
     private long appendColumn(Page page, int position, int channel, NativeArray columnBuffer, int bufferPosition) throws TileDBError
     {
+        OffsetDateTime dt;
         Block block = page.getBlock(channel);
         if (block.isNull(position)) {
             throw new TileDBError("Null values not allowed for insert. Error in table " + table.getTableName() + ", column " + columnHandles.get(channel).getColumnName() + ", row " + position);
@@ -415,52 +420,55 @@ public class TileDBPageSink
             long value;
             switch (colType) {
                 case TILEDB_DATETIME_AS: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) ((type.getLong(block, position)) * 0.0001)).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) * 1000000000000000L;
                     break;
                 }
                 case TILEDB_DATETIME_FS: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) ((type.getLong(block, position)) * 0.001)).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) * 1000000000000L;
                     break;
                 }
                 case TILEDB_DATETIME_PS: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) ((type.getLong(block, position)) * 0.01)).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) * 1000000000;
                     break;
                 }
                 case TILEDB_DATETIME_NS: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((type.getLong(block, position))).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) * 1000000;
                     break;
                 }
                 case TILEDB_DATETIME_US: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((type.getLong(block, position)) * 1000).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) * 1000;
                     break;
                 }
-                case TILEDB_DATETIME_DAY:
-                case TILEDB_DATETIME_MS: {
+                case TILEDB_DATETIME_MS:
+                case TILEDB_DATETIME_DAY: {
                     value = type.getLong(block, position);
                     break;
                 }
                 case TILEDB_DATETIME_SEC: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusSeconds((type.getLong(block, position))).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) / 1000;
                     break;
                 }
                 case TILEDB_DATETIME_MIN: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMinutes((type.getLong(block, position))).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) / (60 * 1000);
                     break;
                 }
                 case TILEDB_DATETIME_HR: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusHours((type.getLong(block, position))).toInstant().toEpochMilli();
+                    value = type.getLong(block, position) / (60 * 60 * 1000);
                     break;
                 }
                 case TILEDB_DATETIME_WEEK: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusWeeks((type.getLong(block, position))).toInstant().toEpochMilli();
+                    dt = new Timestamp(type.getLong(block, position)).toLocalDateTime().atOffset(ZoneOffset.UTC);
+                    value = ChronoUnit.WEEKS.between(dt, zeroDateTime);
                     break;
                 }
                 case TILEDB_DATETIME_MONTH: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMonths((type.getLong(block, position))).toInstant().toEpochMilli();
+                    dt = new Timestamp(type.getLong(block, position)).toLocalDateTime().atOffset(ZoneOffset.UTC);
+                    value = ChronoUnit.MONTHS.between(dt, zeroDateTime);
                     break;
                 }
                 case TILEDB_DATETIME_YEAR: {
-                    value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusYears((type.getLong(block, position))).toInstant().toEpochMilli();
+                    dt = new Timestamp(type.getLong(block, position)).toLocalDateTime().atOffset(ZoneOffset.UTC);
+                    value = ChronoUnit.YEARS.between(dt, zeroDateTime);
                     break;
                 }
                 default: {
