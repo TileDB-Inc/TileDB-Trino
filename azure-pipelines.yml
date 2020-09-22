@@ -44,6 +44,8 @@ stages:
               unset SYSTEM
               set +e
 
+              export JAVA_HOME=$JAVA_HOME_11_X64
+
               mvn clean package -DskipTests
 
               mkdir $BUILD_BINARIESDIRECTORY/jars
