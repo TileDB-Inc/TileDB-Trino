@@ -42,7 +42,9 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -184,6 +186,11 @@ public class TileDBRecordCursor
      * Total number of records that have been visited by the cursor.
      */
     private long numRecordsRead;
+
+    /**
+     * The zero-epoch OffsetDateTime
+     */
+    private static final OffsetDateTime zeroDateTime = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC);
 
     public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query)
     {
@@ -991,64 +998,69 @@ public class TileDBRecordCursor
         int index = cursorPosition;
         Datatype datatype = fieldTypes[field];
 
+        OffsetDateTime ms;
+
         Object fieldArray = queryResultArrays.get(field).getSecond();
         switch (datatype) {
             case TILEDB_INT8: {
-                value = (long) ((byte[]) fieldArray)[index];
+                value = ((byte[]) fieldArray)[index];
                 break;
             }
             case TILEDB_UINT8:
             case TILEDB_INT16: {
-                value = (long) ((short[]) fieldArray)[index];
+                value = ((short[]) fieldArray)[index];
                 break;
             }
             case TILEDB_UINT16:
             case TILEDB_INT32: {
-                value = (long) ((int[]) fieldArray)[index];
+                value = ((int[]) fieldArray)[index];
                 break;
             }
             case TILEDB_DATETIME_AS: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) (((long[]) fieldArray)[index] * 0.0001)).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] / 1000000000000000L;
                 break;
             }
             case TILEDB_DATETIME_FS: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) (((long[]) fieldArray)[index] * 0.001)).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] / 1000000000000L;
                 break;
             }
             case TILEDB_DATETIME_PS: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos((long) (((long[]) fieldArray)[index] * 0.01)).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] / 1000000000;
                 break;
             }
             case TILEDB_DATETIME_NS: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] / 1000000;
                 break;
             }
             case TILEDB_DATETIME_US: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusNanos(((long[]) fieldArray)[index] * 1000).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] / 1000;
                 break;
             }
             case TILEDB_DATETIME_SEC: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusSeconds(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] * 1000;
                 break;
             }
             case TILEDB_DATETIME_MIN: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMinutes(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] * 60 * 1000;
                 break;
             }
             case TILEDB_DATETIME_HR: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusHours(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                value = ((long[]) fieldArray)[index] * 60 * 60 * 1000;
                 break;
             }
             case TILEDB_DATETIME_WEEK: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusWeeks(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                ms = zeroDateTime.toInstant().atOffset(ZoneOffset.UTC).plusWeeks(((long[]) fieldArray)[index]);
+                value = ChronoUnit.DAYS.between(zeroDateTime, ms);
                 break;
             }
             case TILEDB_DATETIME_MONTH: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusMonths(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                ms = zeroDateTime.toInstant().atOffset(ZoneOffset.UTC).plusMonths(((long[]) fieldArray)[index]);
+                value = ChronoUnit.DAYS.between(zeroDateTime, ms);
                 break;
             }
             case TILEDB_DATETIME_YEAR: {
-                value = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC).plusYears(((long[]) fieldArray)[index]).toInstant().toEpochMilli();
+                ms = zeroDateTime.toInstant().atOffset(ZoneOffset.UTC).plusYears(((long[]) fieldArray)[index]);
+                value = ChronoUnit.DAYS.between(zeroDateTime, ms);
                 break;
             }
             case TILEDB_DATETIME_MS:
