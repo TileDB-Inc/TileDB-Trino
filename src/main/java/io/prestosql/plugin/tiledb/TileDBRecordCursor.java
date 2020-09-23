@@ -268,17 +268,16 @@ public class TileDBRecordCursor
             }
         }
 
-        // Build subarray for query based on split
-        subArray = buildSubArray(split, columnHandles);
-        // Get max buffer sizes to build
-        HashMap<String, Pair<Long, Long>> maxSizes = this.array.maxBufferElements(subArray);
+        // Build ranges
+        setRanges(split);
+        // Get estimated buffer sizes to build
+        HashMap<String, Pair<Integer, Integer>> maxSizes = this.query.getResultEstimations();
 
         // Compute an upper bound on the number of results in the subarray.
         totalNumRecordsUB = maxSizes.values().iterator().next().getSecond();
-        query.setSubarray(subArray);
 
         // Build buffers for each column (attribute) in the query.
-        for (Map.Entry<String, Pair<Long, Long>> maxSize : maxSizes.entrySet()) {
+        for (Map.Entry<String, Pair<Integer, Integer>> maxSize : maxSizes.entrySet()) {
             String columnName = maxSize.getKey();
 
             // Check to see if column is in request list, if not don't set a buffer
@@ -297,7 +296,7 @@ public class TileDBRecordCursor
     /**
      * Allocates a NativeArray buffer for the given attribute and adds it to the query object.
      */
-    private void initQueryBufferForField(String field, Pair<Long, Long> maxBufferElements) throws TileDBError
+    private void initQueryBufferForField(String field, Pair<Integer, Integer> maxBufferElements) throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
         boolean isAttribute = arraySchema.hasAttribute(field);
@@ -352,39 +351,32 @@ public class TileDBRecordCursor
     }
 
     /**
-     * Build the subArray for a query based on the split. Currently there is only one split used so this will always
-     * fetch the entire subArray. Constraints are not yet supported.
+     * Build the ranges for a query based on the split
      *
      * @param split         the split to build the subArray based off of
-     * @param columnHandles
-     * @return subArray
+     * @return
      */
-    private NativeArray buildSubArray(TileDBSplit split, List<TileDBColumnHandle> columnHandles) throws TileDBError
+    private void setRanges(TileDBSplit split) throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
-        NativeArray subArray;
         try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
             List<Dimension> dimensions = domain.getDimensions();
             HashMap<String, Pair> nonEmptyDomain = this.array.nonEmptyDomain();
-            subArray = new NativeArray(tileDBClient.getCtx(), 2 * dimensions.size(), dimensions.get(0).getType());
 
-            // Compute and add each dimension bounds to the subarray.
             int dimIdx = 0;
             for (Dimension dimension : dimensions) {
                 Pair dimBounds = getBoundsForDimension(split, dimension, nonEmptyDomain);
                 Class classType = getJavaType(dimension.getType());
                 dimensionIndexes.put(dimension.getName(), dimIdx);
-                subArray.setItem(2 * dimIdx, ConvertUtils.convert(dimBounds.getFirst(), classType));
-                subArray.setItem(2 * dimIdx + 1, ConvertUtils.convert(dimBounds.getSecond(), classType));
+                query.addRange(dimIdx, ConvertUtils.convert(dimBounds.getFirst(), classType), ConvertUtils.convert(dimBounds.getSecond(), classType));
+
+                LOG.info("Query %s setting range for dimension %s to [%s, %s]", queryId, dimension.getName(), dimBounds.getFirst(), dimBounds.getSecond());
                 dimIdx++;
-                LOG.debug("Query %s setting subarray for dimension %s to [%s, %s]", queryId, dimension.getName(), dimBounds.getFirst(), dimBounds.getSecond());
                 dimension.close();
             }
         }
 
-        recordFunctionTime("buildSubArray", timer);
-
-        return subArray;
+        recordFunctionTime("setRanges", timer);
     }
 
     /**
