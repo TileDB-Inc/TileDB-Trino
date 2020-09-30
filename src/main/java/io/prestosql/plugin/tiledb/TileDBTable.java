@@ -65,7 +65,7 @@ public class TileDBTable
         for (Dimension dimension : domain.getDimensions()) {
             Type type = prestoTypeFromTileDBType(dimension.getType());
             columnsMetadata.add(new ColumnMetadata(dimension.getName(), type, "Dimension", null, false));
-            columns.add(new TileDBColumn(dimension.getName(), type, dimension.getType(), false, true));
+            columns.add(new TileDBColumn(dimension.getName(), type, dimension.getType(), dimension.isVar(), true));
             dimension.close();
         }
         // Add attribute as a column

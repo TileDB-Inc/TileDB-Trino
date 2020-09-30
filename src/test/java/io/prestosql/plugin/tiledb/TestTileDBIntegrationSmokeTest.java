@@ -61,7 +61,8 @@ public class TestTileDBIntegrationSmokeTest
     public void testDescribeTable()
     {
         MaterializedResult actualColumns = computeActual("DESC orders").toTestTypes();
-        assertEquals(actualColumns, getExpectedOrdersTableDescription(isParameterizedVarcharSupported()));
+        MaterializedResult expectedColumns = getExpectedOrdersTableDescription(isParameterizedVarcharSupported());
+        assertEquals(actualColumns, expectedColumns);
     }
 
     @Test

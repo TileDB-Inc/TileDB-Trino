@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import io.airlift.slice.Slice;
+import io.prestosql.plugin.tiledb.util.Util;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -51,7 +52,6 @@ import io.tiledb.java.api.ArrayType;
 import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
-import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.TileDBError;
@@ -76,6 +76,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getDimension;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getExtent;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getLowerBound;
@@ -181,7 +182,7 @@ public class TileDBMetadata
                             Object nonEmptyMin = domain.getFirst();
                             Object nonEmptyMax = domain.getSecond();
                             Type type = columnHandle.getColumnType();
-                            if (nonEmptyMin == null || nonEmptyMax == null) {
+                            if (nonEmptyMin == null || nonEmptyMax == null || nonEmptyMin.equals("") || nonEmptyMax.equals("")) {
                                 continue;
                             }
 
@@ -189,6 +190,10 @@ public class TileDBMetadata
                             if (REAL.equals(type)) {
                                 range = Range.range(type, ((Integer) floatToRawIntBits((Float) nonEmptyMin)).longValue(), true,
                                         ((Integer) floatToRawIntBits((Float) nonEmptyMax)).longValue(), true);
+                            }
+                            else if (isVarcharType(type)) {
+                                range = Range.range(type, utf8Slice(nonEmptyMin.toString()), true,
+                                        utf8Slice(nonEmptyMax.toString()), true);
                             }
                             else {
                                 range = Range.range(type,
@@ -514,119 +519,8 @@ public class TileDBMetadata
                     // If the value given by the user is too larger we set it to the max - 1
                     // for the datatype. Eventually we will error to the user with verbose details
                     // instead of altering the values
-                    switch (type) {
-                        case TILEDB_INT8:
-                            if (extent > Byte.MAX_VALUE) {
-                                extent = 10000L;
-                            }
-                            if (upperBound > Byte.MAX_VALUE - extent) {
-                                upperBound = (long) Byte.MAX_VALUE - extent;
-                            }
-                            else if (upperBound < Byte.MIN_VALUE) {
-                                upperBound = (long) Byte.MIN_VALUE + extent;
-                            }
-                            if (lowerBound > Byte.MAX_VALUE) {
-                                lowerBound = (long) Byte.MAX_VALUE - extent;
-                            }
-                            else if (lowerBound < Byte.MIN_VALUE) {
-                                lowerBound = (long) Byte.MIN_VALUE;
-                            }
-                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.byteValue(), upperBound.byteValue()), extent.byteValue()));
-                            break;
-                        case TILEDB_INT16:
-                            if (extent > Short.MAX_VALUE) {
-                                extent = 10000L;
-                            }
-                            if (upperBound > Short.MAX_VALUE - extent) {
-                                upperBound = (long) Short.MAX_VALUE - extent;
-                            }
-                            else if (upperBound < Short.MIN_VALUE) {
-                                upperBound = (long) Short.MIN_VALUE + extent;
-                            }
-                            if (lowerBound > Short.MAX_VALUE) {
-                                lowerBound = (long) Short.MAX_VALUE - extent;
-                            }
-                            else if (lowerBound < Short.MIN_VALUE) {
-                                lowerBound = (long) Short.MIN_VALUE;
-                            }
-                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.shortValue(), upperBound.shortValue()), extent.shortValue()));
-                            break;
-                        case TILEDB_INT32:
-                            if (extent > Integer.MAX_VALUE) {
-                                extent = 10000L;
-                            }
-                            if (upperBound > Integer.MAX_VALUE - extent) {
-                                upperBound = (long) Integer.MAX_VALUE - extent;
-                            }
-                            else if (upperBound < Integer.MIN_VALUE) {
-                                upperBound = (long) Integer.MIN_VALUE + extent;
-                            }
-                            if (lowerBound > Integer.MAX_VALUE) {
-                                lowerBound = (long) Integer.MAX_VALUE - extent;
-                            }
-                            else if (lowerBound < Integer.MIN_VALUE) {
-                                lowerBound = (long) Integer.MIN_VALUE;
-                            }
-                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.intValue(), upperBound.intValue()), extent.intValue()));
-                            break;
-                        case TILEDB_DATETIME_AS:
-                        case TILEDB_DATETIME_FS:
-                        case TILEDB_DATETIME_PS:
-                        case TILEDB_DATETIME_NS:
-                        case TILEDB_DATETIME_US:
-                        case TILEDB_DATETIME_MS:
-                        case TILEDB_DATETIME_SEC:
-                        case TILEDB_DATETIME_MIN:
-                        case TILEDB_DATETIME_HR:
-                        case TILEDB_DATETIME_DAY:
-                        case TILEDB_DATETIME_WEEK:
-                        case TILEDB_DATETIME_MONTH:
-                        case TILEDB_DATETIME_YEAR:
-                        case TILEDB_INT64:
-                            if (upperBound > Long.MAX_VALUE - extent) {
-                                upperBound = (long) Long.MAX_VALUE - extent;
-                            }
-                            domain.addDimension(new Dimension(localCtx, columnName, type, new Pair(lowerBound, upperBound), extent));
-                            break;
-                        case TILEDB_FLOAT32:
-                            if (upperBound > Float.MAX_VALUE - extent) {
-                                upperBound = (long) Float.MAX_VALUE - extent;
-                            }
-                            else if (upperBound < Float.MIN_VALUE) {
-                                upperBound = (long) Float.MIN_VALUE + extent;
-                            }
-                            if (lowerBound > Float.MAX_VALUE) {
-                                lowerBound = (long) Float.MAX_VALUE - extent;
-                            }
-                            else if (lowerBound < Float.MIN_VALUE) {
-                                lowerBound = (long) Float.MIN_VALUE;
-                            }
-                            if (extent > Float.MAX_VALUE) {
-                                extent = (long) Float.MAX_VALUE;
-                            }
-                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.floatValue(), upperBound.floatValue()), extent.floatValue()));
-                            break;
-                        case TILEDB_FLOAT64:
-                            if (upperBound > Double.MAX_VALUE - extent) {
-                                upperBound = (long) Double.MAX_VALUE - extent;
-                            }
-                            else if (upperBound < Double.MIN_VALUE) {
-                                upperBound = (long) Double.MIN_VALUE + extent;
-                            }
-                            if (lowerBound > Double.MAX_VALUE) {
-                                lowerBound = (long) Double.MAX_VALUE - extent;
-                            }
-                            else if (lowerBound < Double.MIN_VALUE) {
-                                lowerBound = (long) Double.MIN_VALUE;
-                            }
-                            if (extent > Double.MAX_VALUE) {
-                                extent = (long) Double.MAX_VALUE;
-                            }
-                            domain.addDimension(new Dimension(localCtx, columnName, classType, new Pair(lowerBound.doubleValue(), upperBound.doubleValue()), extent.doubleValue()));
-                            break;
-                        default:
-                            throw new TileDBError("Invalid dimension datatype order, must be one of [TINYINT, SMALLINT, INTEGER, BIGINT, REAL, DOUBLE]");
-                    }
+
+                    domain.addDimension(Util.toDimension(localCtx, columnName, type, domain, extent, lowerBound, upperBound));
                 }
                 else {
                     Attribute attribute = new Attribute(localCtx, columnName, type);

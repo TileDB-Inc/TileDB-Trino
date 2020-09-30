@@ -16,6 +16,7 @@ package io.prestosql.plugin.tiledb;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.prestosql.plugin.tiledb.util.Util;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -59,6 +60,7 @@ import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEnableStats;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getReadBufferSize;
 import static io.prestosql.spi.type.RealType.REAL;
+import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.Datatype.TILEDB_UINT64;
 import static io.tiledb.java.api.QueryStatus.TILEDB_COMPLETED;
 import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
@@ -368,7 +370,18 @@ public class TileDBRecordCursor
                 Pair dimBounds = getBoundsForDimension(split, dimension, nonEmptyDomain);
                 Class classType = getJavaType(dimension.getType());
                 dimensionIndexes.put(dimension.getName(), dimIdx);
-                query.addRange(dimIdx, ConvertUtils.convert(dimBounds.getFirst(), classType), ConvertUtils.convert(dimBounds.getSecond(), classType));
+
+                if (dimension.isVar()) {
+                    if (dimBounds.getFirst().equals(dimBounds.getSecond())) {
+                        continue;
+                    }
+
+                    query.addRangeVar(dimIdx, dimBounds.getFirst().toString(), dimBounds.getSecond().toString());
+                }
+                else {
+                    query.addRange(dimIdx, ConvertUtils.convert(dimBounds.getFirst(), classType),
+                            ConvertUtils.convert(dimBounds.getSecond(), classType));
+                }
 
                 LOG.info("Query %s setting range for dimension %s to [%s, %s]", queryId, dimension.getName(), dimBounds.getFirst(), dimBounds.getSecond());
                 dimIdx++;
@@ -467,6 +480,11 @@ public class TileDBRecordCursor
                 dimLowerBound = val;
                 dimUpperBound = val;
             }
+            else if (isVarcharType(range.getType())) {
+                String val = new String(((Slice) range.getSingleValue()).getBytes());
+                dimLowerBound = val;
+                dimUpperBound = val;
+            }
             else {
                 dimLowerBound = ConvertUtils.convert(range.getSingleValue(), getJavaType(type));
                 dimUpperBound = dimLowerBound;
@@ -481,13 +499,16 @@ public class TileDBRecordCursor
                 if (REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
                     lowerBoundValue = intBitsToFloat(toIntExact((Long) lowerBoundValue));
                 }
+                else if (isVarcharType(range.getType())) {
+                    lowerBoundValue = new String(((Slice) range.getLow().getValue()).getBytes());
+                }
                 else {
                     lowerBoundValue = ConvertUtils.convert(lowerBoundValue, getJavaType(type));
                 }
 
                 switch (lowerBound.getBound()) {
                     case ABOVE:
-                        dimLowerBound = addEpsilon(lowerBoundValue, type);
+                        dimLowerBound = Util.addEpsilon(lowerBoundValue, type);
                         break;
                     case EXACTLY:
                         dimLowerBound = lowerBoundValue;
@@ -507,6 +528,9 @@ public class TileDBRecordCursor
                 if (REAL.equals(upperBound.getType()) && upperBound.getType().getJavaType() == long.class) {
                     upperBoundValue = intBitsToFloat(toIntExact((Long) upperBoundValue));
                 }
+                else if (isVarcharType(range.getType())) {
+                    upperBoundValue = new String(((Slice) range.getHigh().getValue()).getBytes());
+                }
                 else {
                     upperBoundValue = ConvertUtils.convert(upperBoundValue, getJavaType(type));
                 }
@@ -518,7 +542,7 @@ public class TileDBRecordCursor
                         dimUpperBound = upperBoundValue;
                         break;
                     case BELOW:
-                        dimUpperBound = subtractEpsilon(upperBoundValue, type);
+                        dimUpperBound = Util.subtractEpsilon(upperBoundValue, type);
                         break;
                     default:
                         throw new AssertionError("Unhandled bound: " + upperBound.getBound());
@@ -616,96 +640,6 @@ public class TileDBRecordCursor
                 return (long) a > (long) b ? a : b;
             case TILEDB_CHAR:
                 return (byte) a > (byte) b ? a : b;
-            default:
-                throw new TileDBError("Unsupported TileDB Datatype enum: " + type);
-        }
-    }
-
-    /**
-     * Returns v + eps, where eps is the smallest value for the datatype such that v + eps > v.
-     */
-    private static Object addEpsilon(Object value, Datatype type) throws TileDBError
-    {
-        switch (type) {
-            case TILEDB_CHAR:
-            case TILEDB_INT8:
-                return ((byte) value) < Byte.MAX_VALUE ? ((byte) value + 1) : value;
-            case TILEDB_INT16:
-                return ((short) value) < Short.MAX_VALUE ? ((short) value + 1) : value;
-            case TILEDB_INT32:
-                return ((int) value) < Integer.MAX_VALUE ? ((int) value + 1) : value;
-            case TILEDB_DATETIME_AS:
-            case TILEDB_DATETIME_FS:
-            case TILEDB_DATETIME_PS:
-            case TILEDB_DATETIME_NS:
-            case TILEDB_DATETIME_US:
-            case TILEDB_DATETIME_MS:
-            case TILEDB_DATETIME_SEC:
-            case TILEDB_DATETIME_MIN:
-            case TILEDB_DATETIME_HR:
-            case TILEDB_DATETIME_DAY:
-            case TILEDB_DATETIME_WEEK:
-            case TILEDB_DATETIME_MONTH:
-            case TILEDB_DATETIME_YEAR:
-            case TILEDB_INT64:
-                return ((long) value) < Long.MAX_VALUE ? ((long) value + 1) : value;
-            case TILEDB_UINT8:
-                return ((short) value) < ((short) Byte.MAX_VALUE + 1) ? ((short) value + 1) : value;
-            case TILEDB_UINT16:
-                return ((int) value) < ((int) Short.MAX_VALUE + 1) ? ((int) value + 1) : value;
-            case TILEDB_UINT32:
-                return ((long) value) < ((long) Integer.MAX_VALUE + 1) ? ((long) value + 1) : value;
-            case TILEDB_UINT64:
-                return ((long) value) < ((long) Integer.MAX_VALUE + 1) ? ((long) value + 1) : value;
-            case TILEDB_FLOAT32:
-                return ((float) value) < Float.MAX_VALUE ? Math.nextUp((float) value) : value;
-            case TILEDB_FLOAT64:
-                return ((double) value) < Double.MAX_VALUE ? Math.nextUp((double) value) : value;
-            default:
-                throw new TileDBError("Unsupported TileDB Datatype enum: " + type);
-        }
-    }
-
-    /**
-     * Returns v - eps, where eps is the smallest value for the datatype such that v - eps < v.
-     */
-    private static Object subtractEpsilon(Object value, Datatype type) throws TileDBError
-    {
-        switch (type) {
-            case TILEDB_CHAR:
-            case TILEDB_INT8:
-                return ((byte) value) > Byte.MIN_VALUE ? ((byte) value - 1) : value;
-            case TILEDB_INT16:
-                return ((short) value) > Short.MIN_VALUE ? ((short) value - 1) : value;
-            case TILEDB_INT32:
-                return ((int) value) > Integer.MIN_VALUE ? ((int) value - 1) : value;
-            case TILEDB_INT64:
-                return ((long) value) > Long.MIN_VALUE ? ((long) value - 1) : value;
-            case TILEDB_UINT8:
-                return ((short) value) > ((short) Byte.MIN_VALUE - 1) ? ((short) value - 1) : value;
-            case TILEDB_UINT16:
-                return ((int) value) > ((int) Short.MIN_VALUE - 1) ? ((int) value - 1) : value;
-            case TILEDB_UINT32:
-                return ((long) value) > ((long) Integer.MIN_VALUE - 1) ? ((long) value - 1) : value;
-            case TILEDB_DATETIME_AS:
-            case TILEDB_DATETIME_FS:
-            case TILEDB_DATETIME_PS:
-            case TILEDB_DATETIME_NS:
-            case TILEDB_DATETIME_US:
-            case TILEDB_DATETIME_MS:
-            case TILEDB_DATETIME_SEC:
-            case TILEDB_DATETIME_MIN:
-            case TILEDB_DATETIME_HR:
-            case TILEDB_DATETIME_DAY:
-            case TILEDB_DATETIME_WEEK:
-            case TILEDB_DATETIME_MONTH:
-            case TILEDB_DATETIME_YEAR:
-            case TILEDB_UINT64:
-                return ((long) value) > ((long) Integer.MIN_VALUE - 1) ? ((long) value - 1) : value;
-            case TILEDB_FLOAT32:
-                return ((float) value) > Float.MIN_VALUE ? Math.nextDown((float) value) : value;
-            case TILEDB_FLOAT64:
-                return ((double) value) > Double.MIN_VALUE ? Math.nextDown((double) value) : value;
             default:
                 throw new TileDBError("Unsupported TileDB Datatype enum: " + type);
         }
@@ -1108,40 +1042,28 @@ public class TileDBRecordCursor
     {
         Pair<Long, Long> timer = startTimer();
         Slice value;
-        try {
-            // Check and handle dimension
-            if (columnHandles.get(field).getIsDimension()) {
-                //return Slices.utf8Slice("String dimensions are not supported");
-                throw new TileDBError("String dimensions are not supported");
+        int startPosition = cursorPosition;
+        String bufferName = columnHandles.get(field).getColumnName();
+
+        Pair<Object, Object> buffer = queryResultArrays.get(field);
+        byte[] nativeArrayValues = (byte[]) buffer.getSecond();
+        long[] nativeArrayOffsets = (long[]) buffer.getFirst();
+
+        int endPosition = cursorPosition + 1;
+        if (nativeArrayOffsets != null) {
+            // If its not the first value, we need to see where the previous position ended to know where to start.
+            if (startPosition > 0) {
+                startPosition = (int) nativeArrayOffsets[cursorPosition];
             }
-            else {
-                int startPosition = cursorPosition;
-                String bufferName = columnHandles.get(field).getColumnName();
-
-                Pair<Object, Object> buffer = queryResultArrays.get(field);
-                byte[] nativeArrayValues = (byte[]) buffer.getSecond();
-                long[] nativeArrayOffsets = (long[]) buffer.getFirst();
-
-                int endPosition = cursorPosition + 1;
-                if (nativeArrayOffsets != null) {
-                    // If its not the first value, we need to see where the previous position ended to know where to start.
-                    if (startPosition > 0) {
-                        startPosition = (int) nativeArrayOffsets[cursorPosition];
-                    }
-                    // If the current position is equal to the number of results - 1 then we are at the last varchar value
-                    if (cursorPosition >= nativeArrayOffsets.length - 1) {
-                        endPosition = nativeArrayValues.length;
-                    }
-                    else { // Else read the end from the next offset.
-                        endPosition = (int) nativeArrayOffsets[cursorPosition + 1];
-                    }
-                }
-                value = Slices.wrappedBuffer(nativeArrayValues, startPosition, endPosition - startPosition);
+            // If the current position is equal to the number of results - 1 then we are at the last varchar value
+            if (cursorPosition >= nativeArrayOffsets.length - 1) {
+                endPosition = nativeArrayValues.length;
+            }
+            else { // Else read the end from the next offset.
+                endPosition = (int) nativeArrayOffsets[cursorPosition + 1];
             }
         }
-        catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_RECORD_CURSOR_ERROR, tileDBError);
-        }
+        value = Slices.wrappedBuffer(nativeArrayValues, startPosition, endPosition - startPosition);
 
         recordFunctionTime("getSlice", timer);
 
