@@ -22,6 +22,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarbinaryType;
+import io.prestosql.spi.type.VarcharType;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.TileDBError;
 
@@ -121,6 +122,7 @@ public class TileDBModule
                 return BIGINT;
             case TILEDB_UINT64:
                 return BIGINT;
+            case TILEDB_STRING_ASCII:
             case TILEDB_CHAR:
                 return VARCHAR;
             case TILEDB_FLOAT32:
@@ -150,6 +152,7 @@ public class TileDBModule
 
     public static Datatype tileDBTypeFromPrestoType(Type type) throws TileDBError
     {
+        type.getJavaType();
         if (type.equals(TINYINT)) {
             return Datatype.TILEDB_INT8;
         }
@@ -162,8 +165,16 @@ public class TileDBModule
         else if (type.equals(BIGINT)) {
             return Datatype.TILEDB_INT64;
         }
-        else if (isVarcharType(type) || isCharType(type)) {
+        else if (isCharType(type)) {
             return Datatype.TILEDB_CHAR;
+        }
+        else if (isVarcharType(type)) {
+            VarcharType varcharType = ((VarcharType) type);
+            // Return TILEDB_CHAR in case the datatype is varchar(1)
+            if (varcharType.getLength().isPresent() && varcharType.getLength().get().equals(1)) {
+                return Datatype.TILEDB_CHAR;
+            }
+            return Datatype.TILEDB_STRING_ASCII;
         }
         else if (type instanceof VarbinaryType) {
             return Datatype.TILEDB_INT8;

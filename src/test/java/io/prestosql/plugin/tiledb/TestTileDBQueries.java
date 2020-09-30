@@ -234,6 +234,54 @@ public class TestTileDBQueries
                 .row((int) 5, 15)
                 .build());
 
+        MaterializedResult r = computeActual("SELECT * FROM " + arrayName);
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testCreate1DVectorString()
+    {
+        // Integer
+        String arrayName = "test_create_string";
+        dropArray(arrayName);
+        create1DVectorStringDimension(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "varchar", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .build());
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "('abc', 1), ('def', 2), ('ghi', 3)", arrayName);
+
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, INTEGER)
+                .row("abc", 1)
+                .row("def", 2)
+                .row("ghi", 3)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x >= 'def' ORDER BY x ASC", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, INTEGER)
+                .row("def", 2)
+                .row("ghi", 3)
+                .build());
+
+        selectSql = format("SELECT * FROM %s WHERE x > 'abc' AND x < 'ghi'", arrayName);
+        selectResult = computeActual(selectSql);
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, INTEGER)
+                .row("def", 2)
+                .build());
+
         dropArray(arrayName);
     }
 
@@ -748,6 +796,16 @@ public class TestTileDBQueries
         QueryRunner queryRunner = getQueryRunner();
         String createSql = format("CREATE TABLE %s(" +
                 "x double WITH (dimension=true), " +
+                "a1 integer" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorStringDimension(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x varchar WITH (dimension=true), " +
                 "a1 integer" +
                 ") WITH (uri='%s')", arrayName, arrayName);
         queryRunner.execute(createSql);

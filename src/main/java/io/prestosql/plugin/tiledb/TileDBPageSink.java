@@ -306,7 +306,7 @@ public class TileDBPageSink
             // If the buffer is larger than the last position we need to resize
             if (values.getSize() > effectiveElementInBuffer) {
                 if (values.getJavaType().equals(String.class)) {
-                    values = new NativeArray(ctx, new String((byte[]) values.toJavaArray(toIntExact(effectiveElementInBuffer))), values.getJavaType());
+                    values = new NativeArray(ctx, new String((byte[]) values.toJavaArray(toIntExact(effectiveElementInBuffer))), nativeType);
                 }
                 else {
                     values = new NativeArray(ctx, values.toJavaArray(toIntExact(effectiveElementInBuffer)), nativeType);
