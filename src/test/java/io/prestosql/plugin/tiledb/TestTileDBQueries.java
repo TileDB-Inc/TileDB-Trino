@@ -31,6 +31,7 @@ import io.tiledb.java.api.TileDBObject;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.sql.Timestamp;
@@ -53,6 +54,7 @@ import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
 import static io.tiledb.java.api.Layout.TILEDB_ROW_MAJOR;
 import static io.tiledb.java.api.QueryType.TILEDB_WRITE;
 import static java.lang.String.format;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestTileDBQueries
@@ -504,6 +506,20 @@ public class TestTileDBQueries
     }
 
     @Test
+    public void testCreateTableWithoutURI()
+    {
+        // Integer
+        String arrayName = "test_create_string";
+        create1DVectorStringDimensionWithoutURI(arrayName);
+
+        File f = new File(arrayName);
+
+        assertTrue(f.exists());
+
+        dropArray(arrayName);
+    }
+
+    @Test
     public void testInsert()
     {
         String arrayName = "test_insert";
@@ -808,6 +824,16 @@ public class TestTileDBQueries
                 "x varchar WITH (dimension=true), " +
                 "a1 integer" +
                 ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorStringDimensionWithoutURI(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x varchar WITH (dimension=true), " +
+                "a1 integer" +
+                ")", arrayName);
         queryRunner.execute(createSql);
     }
 
