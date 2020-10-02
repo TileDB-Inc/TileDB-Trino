@@ -176,16 +176,13 @@ public class Util
         // filter lists are in the form "(filter, option), (filter, option), etc.")
         List<Pair<String, Integer>> filterResults = new ArrayList<>();
         // String[] splitVals = csvList.split("\\s*,\\s*");
-        Pattern filterListRegex = Pattern.compile("\\(\\s?(.*?)\\s?,\\s?(.*?)\\s?\\)");
+        Pattern filterListRegex = Pattern.compile("\\((.*?)\\)");
         Matcher filterListMatcher = filterListRegex.matcher(csvList);
         while (filterListMatcher.find()) {
-            String filterString = filterListMatcher.group();
+            String filterString = filterListMatcher.group(1);
             String[] filterPair = filterString.split("\\s*,\\s*");
-            if (filterPair.length != 2) {
-                throw new IllegalArgumentException("Unknown TileDB filter syntax " + filterString);
-            }
             // remove parens
-            String filterName = filterPair[0].substring(1);
+            String filterName = filterPair[0];
             List<String> validFilters = Arrays.asList(new String[]{"GZIP", "ZSTD", "LZ4", "RLE", "BZIP2",
                     "DOUBLE_DELTA", "BIT_WIDTH_REDUCTION", "BITSHUFFLE", "BYTESHUFFLE", "POSITIVE_DELTA"});
 
@@ -196,7 +193,6 @@ public class Util
             if (filterPair.length == 2) {
                 // remove parens
                 String filterOptionStr = filterPair[1];
-                filterOptionStr = filterOptionStr.substring(0, filterOptionStr.length() - 1);
                 try {
                     filterOption = Integer.parseInt(filterOptionStr);
                 }
