@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.longProperty;
+import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 
 public class TileDBColumnProperties
 {
@@ -31,6 +32,7 @@ public class TileDBColumnProperties
     public static final String LowerBound = "lower_bound";
     public static final String UpperBound = "upper_bound";
     public static final String Extent = "extent";
+    public static final String FilterList = "filter_list";
     private final List<PropertyMetadata<?>> columnProperties;
 
     @Inject
@@ -56,6 +58,10 @@ public class TileDBColumnProperties
                         Extent,
                         "Dimension Extent",
                         10L,
+                        false),
+                stringProperty(FilterList,
+                        "The filter list",
+                        "",
                         false));
     }
 
@@ -77,6 +83,16 @@ public class TileDBColumnProperties
     public static Long getUpperBound(Map<String, Object> tableProperties)
     {
         return (Long) tableProperties.get(UpperBound);
+    }
+
+    public static String getFilterList(Map<String, Object> tableProperties)
+    {
+        if (tableProperties.containsKey(FilterList)) {
+            return (String) tableProperties.get(FilterList);
+        }
+        else {
+            return "";
+        }
     }
 
     public static Long getExtent(Map<String, Object> tableProperties)

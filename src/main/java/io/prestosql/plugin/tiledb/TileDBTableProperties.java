@@ -32,6 +32,7 @@ public class TileDBTableProperties
     public static final String CellOrder = "cell_order";
     public static final String TileOrder = "tile_order";
     public static final String Capacity = "capacity";
+    public static final String OffsetsFilterList = "offsets_filter_list";
     private final List<PropertyMetadata<?>> tableProperties;
 
     @Inject
@@ -62,6 +63,11 @@ public class TileDBTableProperties
                         Capacity,
                         "Capacity of sparse array",
                         10000L,
+                        false),
+                stringProperty(
+                        OffsetsFilterList,
+                        "The offsets filter list",
+                        "",
                         false));
     }
 
@@ -93,5 +99,15 @@ public class TileDBTableProperties
     public static Long getCapacity(Map<String, Object> tableProperties)
     {
         return (Long) tableProperties.get(Capacity);
+    }
+
+    public static String getOffsetsFilterList(Map<String, Object> tableProperties)
+    {
+        if (tableProperties.containsKey(OffsetsFilterList)) {
+            return (String) tableProperties.get(OffsetsFilterList);
+        }
+        else {
+            return "";
+        }
     }
 }
