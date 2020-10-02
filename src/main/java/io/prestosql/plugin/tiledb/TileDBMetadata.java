@@ -79,6 +79,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getDimension;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getExtent;
+import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getFilterList;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getLowerBound;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getUpperBound;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
@@ -91,7 +92,6 @@ import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
 import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
 import static io.tiledb.java.api.Constants.TILEDB_VAR_NUM;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
-import static io.tiledb.java.api.Types.getJavaType;
 import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
@@ -472,13 +472,15 @@ public class TileDBMetadata
         String schema = schemaTableName.getSchemaName();
         String table = schemaTableName.getTableName();
 
+        Map<String, Object> properties = tableMetadata.getProperties();
+
         try {
             Context localCtx = tileDBClient.buildContext(session);
 
             // Get URI from table properties
             String uri;
-            if (tableMetadata.getProperties().containsKey(TileDBTableProperties.URI)) {
-                uri = (String) tableMetadata.getProperties().get(TileDBTableProperties.URI);
+            if (properties.containsKey(TileDBTableProperties.URI)) {
+                uri = (String) properties.get(TileDBTableProperties.URI);
             }
             else {
                 uri = table;
@@ -486,7 +488,7 @@ public class TileDBMetadata
 
             ArrayType arrayType;
             // Get array type from table properties
-            String arrayTypeStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.ArrayType)).toUpperCase();
+            String arrayTypeStr = ((String) properties.get(TileDBTableProperties.ArrayType)).toUpperCase();
 
             // Set array type based on string value
             if (arrayTypeStr.equals("DENSE")) {
@@ -505,7 +507,16 @@ public class TileDBMetadata
 
             // If we have a sparse array we need to set capacity
             if (arrayType == TILEDB_SPARSE) {
-                arraySchema.setCapacity((long) tableMetadata.getProperties().get(TileDBTableProperties.Capacity));
+                arraySchema.setCapacity((long) properties.get(TileDBTableProperties.Capacity));
+            }
+
+            if (properties.containsKey(TileDBTableProperties.OffsetsFilterList)) {
+                String filters = TileDBTableProperties.getOffsetsFilterList(properties);
+                Optional<List<Pair<String, Integer>>> filterPairs = Util.tryParseFilterList(filters);
+
+                if (filterPairs.isPresent()) {
+                    arraySchema.setOffsetsFilterList(Util.createTileDBFilterList(localCtx, filterPairs.get()));
+                }
             }
 
             List<String> columnNames = new ArrayList<>();
@@ -516,7 +527,11 @@ public class TileDBMetadata
 
                 // Get column type, convert to type types
                 Datatype type = tileDBTypeFromPrestoType(column.getType());
-                Class classType = getJavaType(type);
+
+                // Get filter list
+                String filters = getFilterList(columnProperties);
+                Optional<List<Pair<String, Integer>>> filterPairs = Util.tryParseFilterList(filters);
+
                 // Check if dimension or attribute
                 if (getDimension(columnProperties)) {
                     Long lowerBound = getLowerBound(columnProperties);
@@ -527,7 +542,14 @@ public class TileDBMetadata
                     // for the datatype. Eventually we will error to the user with verbose details
                     // instead of altering the values
 
-                    domain.addDimension(Util.toDimension(localCtx, columnName, type, domain, extent, lowerBound, upperBound));
+                    io.tiledb.java.api.Dimension dimension = Util.toDimension(localCtx, columnName, type, domain, extent, lowerBound,
+                            upperBound);
+
+                    if (filterPairs.isPresent()) {
+                        dimension.setFilterList(Util.createTileDBFilterList(localCtx, filterPairs.get()));
+                    }
+
+                    domain.addDimension(dimension);
                 }
                 else {
                     Attribute attribute = new Attribute(localCtx, columnName, type);
@@ -538,6 +560,11 @@ public class TileDBMetadata
                             attribute.setCellValNum(TILEDB_VAR_NUM);
                         }
                     }
+
+                    if (filterPairs.isPresent()) {
+                        attribute.setFilterList(Util.createTileDBFilterList(localCtx, filterPairs.get()));
+                    }
+
                     arraySchema.addAttribute(attribute);
                 }
 
@@ -545,8 +572,8 @@ public class TileDBMetadata
             }
 
             // Set cell and tile order
-            String cellOrderStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.CellOrder)).toUpperCase();
-            String tileOrderStr = ((String) tableMetadata.getProperties().get(TileDBTableProperties.TileOrder)).toUpperCase();
+            String cellOrderStr = ((String) properties.get(TileDBTableProperties.CellOrder)).toUpperCase();
+            String tileOrderStr = ((String) properties.get(TileDBTableProperties.TileOrder)).toUpperCase();
 
             switch (cellOrderStr) {
                 case "ROW_MAJOR":

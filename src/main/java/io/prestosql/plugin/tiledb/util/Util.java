@@ -13,12 +13,30 @@
  */
 package io.prestosql.plugin.tiledb.util;
 
+import io.tiledb.java.api.BitShuffleFilter;
+import io.tiledb.java.api.BitWidthReductionFilter;
+import io.tiledb.java.api.ByteShuffleFilter;
+import io.tiledb.java.api.Bzip2Filter;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.Domain;
+import io.tiledb.java.api.DoubleDeltaFilter;
+import io.tiledb.java.api.Filter;
+import io.tiledb.java.api.FilterList;
+import io.tiledb.java.api.GzipFilter;
+import io.tiledb.java.api.LZ4Filter;
+import io.tiledb.java.api.NoneFilter;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.TileDBError;
+import io.tiledb.java.api.ZstdFilter;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Util
 {
@@ -29,7 +47,8 @@ public class Util
      */
     private static final StringPartitioner stringPartitioner = new StringPartitioner();
 
-    public static Dimension toDimension(Context localCtx, String dimName, Datatype type, Domain domain, Long extent, Long lowerBound, Long upperBound) throws TileDBError
+    public static Dimension toDimension(Context localCtx, String dimName, Datatype type, Domain domain, Long extent,
+                                        Long lowerBound, Long upperBound) throws TileDBError
     {
         Class classType = type.javaClass();
         switch (type) {
@@ -141,6 +160,136 @@ public class Util
             default:
                 throw new TileDBError(String.format("Invalid dimension datatype %s, must be one of [TINYINT, SMALLINT, INTEGER, BIGINT, REAL, DOUBLE]", type.toString()));
         }
+    }
+
+    /**
+     * Parses a comma-separated filter list and returns a list with key-value pairs,
+     * where the key is the filter name (e.g. bzip2) and the value the filter's value
+     * (e.g. -1)
+     * @param csvList
+     * @return
+     * @throws IllegalArgumentException
+     */
+    public static Optional<List<Pair<String, Integer>>> tryParseFilterList(String csvList)
+            throws IllegalArgumentException
+    {
+        // filter lists are in the form "(filter, option), (filter, option), etc.")
+        List<Pair<String, Integer>> filterResults = new ArrayList<>();
+        // String[] splitVals = csvList.split("\\s*,\\s*");
+        Pattern filterListRegex = Pattern.compile("\\(\\s?(.*?)\\s?,\\s?(.*?)\\s?\\)");
+        Matcher filterListMatcher = filterListRegex.matcher(csvList);
+        while (filterListMatcher.find()) {
+            String filterString = filterListMatcher.group();
+            String[] filterPair = filterString.split("\\s*,\\s*");
+            if (filterPair.length != 2) {
+                throw new IllegalArgumentException("Unknown TileDB filter syntax " + filterString);
+            }
+            // remove parens
+            String filterName = filterPair[0].substring(1);
+            List<String> validFilters = Arrays.asList(new String[]{"GZIP", "ZSTD", "LZ4", "RLE", "BZIP2",
+                    "DOUBLE_DELTA", "BIT_WIDTH_REDUCTION", "BITSHUFFLE", "BYTESHUFFLE", "POSITIVE_DELTA"});
+
+            if (!validFilters.contains(filterName.toUpperCase())) {
+                throw new IllegalArgumentException("Unknown TileDB filter string value: " + filterName);
+            }
+            Integer filterOption = -1;
+            if (filterPair.length == 2) {
+                // remove parens
+                String filterOptionStr = filterPair[1];
+                filterOptionStr = filterOptionStr.substring(0, filterOptionStr.length() - 1);
+                try {
+                    filterOption = Integer.parseInt(filterOptionStr);
+                }
+                catch (NumberFormatException err) {
+                    throw new IllegalArgumentException(
+                            "Cannot parse filter option value for " + filterName + ": " + filterOptionStr);
+                }
+            }
+            filterResults.add(new Pair<>(filterName, filterOption));
+        }
+        if (filterResults.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(filterResults);
+    }
+
+    /**
+     * Returns a TileDB FilterList
+     * @param ctx The context
+     * @param filterListDesc The filter pairs list extracted with the tryParseFilterList method
+     * @return The FilterList instance
+     * @throws TileDBError
+     */
+    public static FilterList createTileDBFilterList(
+            Context ctx, List<Pair<String, Integer>> filterListDesc) throws TileDBError
+    {
+        FilterList filterList = new FilterList(ctx);
+        try {
+            for (Pair<String, Integer> filterDesc : filterListDesc) {
+                String filterName = filterDesc.getFirst();
+                Integer filterOption = filterDesc.getSecond();
+                if (filterName.equalsIgnoreCase("NONE")) {
+                    try (Filter filter = new NoneFilter(ctx)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("GZIP")) {
+                    try (Filter filter = new GzipFilter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("ZSTD")) {
+                    try (Filter filter = new ZstdFilter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("LZ4")) {
+                    try (Filter filter = new LZ4Filter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("RLE")) {
+                    try (Filter filter = new LZ4Filter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("BZIP2")) {
+                    try (Filter filter = new Bzip2Filter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("DOUBLE_DELTA")) {
+                    try (Filter filter = new DoubleDeltaFilter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("BIT_WIDTH_REDUCTION")) {
+                    try (Filter filter = new BitWidthReductionFilter(ctx, filterOption)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("BITSHUFFLE")) {
+                    try (Filter filter = new BitShuffleFilter(ctx)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("BYTESHUFFLE")) {
+                    try (Filter filter = new ByteShuffleFilter(ctx)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+                else if (filterName.equalsIgnoreCase("POSITIVE_DELTA")) {
+                    try (Filter filter = new ByteShuffleFilter(ctx)) {
+                        filterList.addFilter(filter);
+                    }
+                }
+            }
+        }
+        catch (TileDBError err) {
+            filterList.close();
+            throw err;
+        }
+        return filterList;
     }
 
     /**

@@ -20,10 +20,14 @@ import io.prestosql.testing.QueryRunner;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
+import io.tiledb.java.api.ByteShuffleFilter;
+import io.tiledb.java.api.Bzip2Filter;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.Domain;
+import io.tiledb.java.api.FilterList;
+import io.tiledb.java.api.GzipFilter;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.Query;
 import io.tiledb.java.api.TileDBError;
@@ -520,6 +524,30 @@ public class TestTileDBQueries
     }
 
     @Test
+    public void testCreateTableWithFilters() throws TileDBError
+    {
+        // Integer
+        String arrayName = "test_create_with_filters";
+        create1DVectorStringWithFilters(arrayName);
+        Array array = new Array(new Context(), arrayName);
+
+        FilterList d1FilterList = array.getSchema().getDomain().getDimension(0).getFilterList();
+        FilterList a1FilterList = array.getSchema().getAttribute(0).getFilterList();
+        FilterList offsetsFilterList = array.getSchema().getOffsetsFilterList();
+
+        assertEquals(d1FilterList.getNumFilters(), 2);
+        assertEquals(a1FilterList.getNumFilters(), 0);
+        assertEquals(offsetsFilterList.getNumFilters(), 2);
+
+        assertEquals(d1FilterList.getFilter(0).getClass(), ByteShuffleFilter.class);
+        assertEquals(d1FilterList.getFilter(1).getClass(), GzipFilter.class);
+        assertEquals(offsetsFilterList.getFilter(0).getClass(), Bzip2Filter.class);
+        assertEquals(offsetsFilterList.getFilter(1).getClass(), GzipFilter.class);
+
+        dropArray(arrayName);
+    }
+
+    @Test
     public void testInsert()
     {
         String arrayName = "test_insert";
@@ -834,6 +862,16 @@ public class TestTileDBQueries
                 "x varchar WITH (dimension=true), " +
                 "a1 integer" +
                 ")", arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorStringWithFilters(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x varchar WITH (dimension=true,filter_list='(byteshuffle), (gzip,9)'), " +
+                "a1 integer" +
+                ") WITH (uri='%s',offsets_filter_list='(bzip2,-1), (gzip,3)')", arrayName, arrayName);
         queryRunner.execute(createSql);
     }
 
