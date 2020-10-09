@@ -28,6 +28,7 @@ import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
+import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.NativeArray;
 import io.tiledb.java.api.Pair;
@@ -51,6 +52,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_PAGE_SINK_ERROR;
+import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -106,8 +108,14 @@ public class TileDBPageSink
             // Set max write buffer size from session configuration parameter
             this.maxBufferSize = getWriteBufferSize(session);
 
-            // Open the array in write mode
-            array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE);
+            String key = getEncryptionKey(session);
+
+            if (key != null) {
+                array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+            }
+            else {
+                array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE);
+            }
             // Create query object
             query = new Query(array, QueryType.TILEDB_WRITE);
             // All writes are unordered

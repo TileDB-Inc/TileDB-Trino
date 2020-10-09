@@ -49,23 +49,39 @@ public final class TileDBQueryRunner
 
     public static DistributedQueryRunner createTileDBQueryRunner() throws Exception
     {
-        return createTileDBQueryRunner(TpchTable.getTables(), ImmutableMap.of(), new Context());
+        return createTileDBQueryRunner(TpchTable.getTables(), ImmutableMap.of(), ImmutableMap.of(), new Context());
+    }
+
+    public static DistributedQueryRunner createTileDBQueryRunner(ImmutableMap<String, String> sessionProperties)
+            throws Exception
+    {
+        return createTileDBQueryRunner(TpchTable.getTables(), sessionProperties, ImmutableMap.of(), new Context());
     }
 
     public static DistributedQueryRunner createTileDBQueryRunner(TpchTable<?>... tables) throws Exception
     {
-        return createTileDBQueryRunner(ImmutableList.copyOf(tables), ImmutableMap.of(), new Context());
+        return createTileDBQueryRunner(ImmutableList.copyOf(tables), ImmutableMap.of(), ImmutableMap.of(),
+                new Context());
     }
 
-    public static DistributedQueryRunner createTileDBQueryRunner(Iterable<TpchTable<?>> tables, Map<String, String> extraProperties, Context ctx)
+    public static DistributedQueryRunner createTileDBQueryRunner(Iterable<TpchTable<?>> tables,
+                                                                 ImmutableMap<String, String> sessionSystemProperties,
+                                                                 Map<String, String> extraProperties, Context ctx)
             throws Exception
     {
-        Session session = testSessionBuilder()
+        Session.SessionBuilder sessionBuilder = testSessionBuilder()
                 .setCatalog("tiledb")
-                .setSchema("tiledb")
-                .build();
+                .setSchema("tiledb");
 
-        DistributedQueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(4).setExtraProperties(extraProperties).build();
+        for (Map.Entry<String, String> entry : sessionSystemProperties.entrySet()) {
+            sessionBuilder.setSystemProperty(entry.getKey(), entry.getValue());
+        }
+
+        Session session = sessionBuilder.build();
+
+        DistributedQueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(4)
+                .setExtraProperties(extraProperties).build();
+
         try {
             List<String> existingTables = new ArrayList<>();
             List<TpchTable<?>> tablesToCopy = new ArrayList<>();

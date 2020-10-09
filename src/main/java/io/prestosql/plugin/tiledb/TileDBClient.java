@@ -18,6 +18,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.tiledb.java.api.Config;
 import io.tiledb.java.api.Context;
+import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
 import oshi.hardware.HardwareAbstractionLayer;
@@ -116,11 +117,25 @@ public class TileDBClient
     }
 
     /**
+    * Helper function to add a table to the catalog
+    *
+    * @param schema schema to add table to
+    * @param arrayUri uri of array/table
+    */
+    public TileDBTable addTableFromURI(Context localCtx, String schema, URI arrayUri)
+    {
+        return addTableFromURI(localCtx, schema, arrayUri, null, null);
+    }
+
+    /**
      * Helper function to add a table to the catalog
      * @param schema schema to add table to
      * @param arrayUri uri of array/table
+     * @param encryptionType The encryption type
+     * @param encryptionKey The encryption key in bytes
      */
-    public TileDBTable addTableFromURI(Context localCtx, String schema, URI arrayUri)
+    public TileDBTable addTableFromURI(Context localCtx, String schema, URI arrayUri, EncryptionType encryptionType,
+                                       byte[] encryptionKey)
     {
         // Currently create the "table name" by splitting the path and grabbing the last part.
         String path = arrayUri.getPath();
@@ -128,7 +143,7 @@ public class TileDBClient
         // Create a table instances
         TileDBTable tileDBTable = null;
         try {
-            tileDBTable = new TileDBTable(schema, tableName, arrayUri, localCtx);
+            tileDBTable = new TileDBTable(schema, tableName, arrayUri, localCtx, encryptionType, encryptionKey);
             Map<String, TileDBTable> tableMapping = schemas.get(schema);
             if (tableMapping == null) {
                 tableMapping = new HashMap<>();
@@ -172,9 +187,12 @@ public class TileDBClient
      * Fetches a table object given a schema and a table name
      * @param schema
      * @param tableName
+     * @param encryptionType
+     * @param encryptionKey
      * @return table object
      */
-    public TileDBTable getTable(ConnectorSession session, String schema, String tableName)
+    public TileDBTable getTable(ConnectorSession session, String schema, String tableName,
+                                EncryptionType encryptionType, byte[] encryptionKey)
     {
         requireNonNull(schema, "schema is null");
         requireNonNull(tableName, "tableName is null");
@@ -183,7 +201,7 @@ public class TileDBClient
         if (tables == null || tables.get(tableName) == null) {
             try {
                 Context localCtx = buildContext(session);
-                return addTableFromURI(localCtx, schema, new URI(tableName));
+                return addTableFromURI(localCtx, schema, new URI(tableName), encryptionType, encryptionKey);
             }
             catch (URISyntaxException e) {
                 throw new PrestoException(TILEDB_UNEXPECTED_ERROR, e);
@@ -193,6 +211,23 @@ public class TileDBClient
             }
         }
         return tables.get(tableName);
+    }
+
+    /**
+     * Fetches a table object given a schema and a table name
+     * @param schema
+     * @param tableName
+     * @return table object
+     */
+    public TileDBTable getTable(ConnectorSession session, String schema, String tableName)
+    {
+        String key = TileDBSessionProperties.getEncryptionKey(session);
+        if (key != null) {
+            return this.getTable(session, schema, tableName, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+        }
+        else {
+            return this.getTable(session, schema, tableName, null, null);
+        }
     }
 
     public Context getCtx()
