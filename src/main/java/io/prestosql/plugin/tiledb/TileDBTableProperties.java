@@ -33,6 +33,7 @@ public class TileDBTableProperties
     public static final String TileOrder = "tile_order";
     public static final String Capacity = "capacity";
     public static final String OffsetsFilterList = "offsets_filter_list";
+    public static final String EncryptionKey = "encryption_key";
     private final List<PropertyMetadata<?>> tableProperties;
 
     @Inject
@@ -68,6 +69,11 @@ public class TileDBTableProperties
                         OffsetsFilterList,
                         "The offsets filter list",
                         "",
+                        false),
+                stringProperty(
+                        EncryptionKey,
+                        "The offsets filter list",
+                        null,
                         false));
     }
 
@@ -109,5 +115,10 @@ public class TileDBTableProperties
         else {
             return "";
         }
+    }
+
+    public static String getEncryptionKey(Map<String, Object> tableProperties)
+    {
+        return (String) tableProperties.get(EncryptionKey);
     }
 }

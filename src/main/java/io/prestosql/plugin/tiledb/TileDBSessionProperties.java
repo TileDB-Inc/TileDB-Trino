@@ -35,6 +35,7 @@ public final class TileDBSessionProperties
     private static final String SPLIT_ONLY_PREDICATES = "split_only_predicates";
     private static final String ENABLE_STATS = "enable_stats";
     private static final String TILEDB_CONFIG = "tiledb_config";
+    private static final String ENCRYPTION_KEY = "encryption_key";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -81,6 +82,11 @@ public final class TileDBSessionProperties
                         TILEDB_CONFIG,
                         "TileDB config parameters in key1=value1,key2=value2 form",
                         tileDBConfig.getTileDBConfig(),
+                        false),
+                stringProperty(
+                        ENCRYPTION_KEY,
+                        "TileDB array encryption key",
+                        null,
                         false));
     }
 
@@ -127,5 +133,10 @@ public final class TileDBSessionProperties
     public static String getTileDBConfig(ConnectorSession session)
     {
         return session.getProperty(TILEDB_CONFIG, String.class);
+    }
+
+    public static String getEncryptionKey(ConnectorSession session)
+    {
+        return session.getProperty(ENCRYPTION_KEY, String.class);
     }
 }

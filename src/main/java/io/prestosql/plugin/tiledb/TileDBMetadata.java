@@ -52,6 +52,7 @@ import io.tiledb.java.api.ArrayType;
 import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
+import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.TileDBError;
@@ -85,7 +86,9 @@ import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getUpperBound;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBModule.tileDBTypeFromPrestoType;
+import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
+import static io.prestosql.plugin.tiledb.TileDBTableProperties.getEncryptionKey;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
@@ -131,7 +134,16 @@ public class TileDBMetadata
     @Override
     public TileDBTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
-        TileDBTable table = tileDBClient.getTable(session, tableName.getSchemaName(), tableName.getTableName());
+        TileDBTable table;
+
+        String key = getEncryptionKey(session);
+        if (key != null) {
+            table = tileDBClient.getTable(session, tableName.getSchemaName(), tableName.getTableName(), EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+        }
+        else {
+            table = tileDBClient.getTable(session, tableName.getSchemaName(), tableName.getTableName());
+        }
+
         if (table == null) {
             return null;
         }
@@ -170,7 +182,16 @@ public class TileDBMetadata
         Map<ColumnHandle, Domain> enforceableDimensionDomains = new HashMap<>(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.in(dimensionHandles)));
 
         if (!getSplitOnlyPredicates(session)) {
-            try (Array array = new Array(tileDBClient.buildContext(session), tableHandle.getURI().toString(), TILEDB_READ)) {
+            try {
+                Array array;
+                String key = getEncryptionKey(session);
+                if (key == null) {
+                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ);
+                }
+                else {
+                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+                }
+
                 HashMap<String, Pair> nonEmptyDomain = array.nonEmptyDomain();
                 // Find any dimension which do not have predicates and add one for the entire domain.
                 // This is required so we can later split on the predicates
@@ -207,6 +228,7 @@ public class TileDBMetadata
                         }
                     }
                 }
+                array.close();
             }
             catch (TileDBError tileDBError) {
                 throw new PrestoException(TILEDB_RECORD_SET_ERROR, tileDBError);
@@ -602,14 +624,21 @@ public class TileDBMetadata
 
             // Validate schema
             arraySchema.check();
+            TileDBTable tileDBTable;
 
-            Array.create(uri, arraySchema);
+            String key = getEncryptionKey(tableMetadata.getProperties());
+            if (key != null) {
+                Array.create(uri, arraySchema, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+                tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri), EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+            }
+            else {
+                Array.create(uri, arraySchema);
+                tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri));
+            }
 
             // Clean up
             domain.close();
             arraySchema.close();
-
-            TileDBTable tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri));
 
             // Loop through all columns and build list of column handles in the proper ordering. Order is important here
             // because we will use the list to avoid hashmap lookups for better performance.

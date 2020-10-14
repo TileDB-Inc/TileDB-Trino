@@ -29,7 +29,9 @@ import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.tiledb.java.api.Array;
+import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Pair;
+import io.tiledb.java.api.QueryType;
 import io.tiledb.java.api.TileDBError;
 import org.apache.commons.beanutils.ConvertUtils;
 
@@ -43,6 +45,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
+import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
 import static io.prestosql.spi.predicate.Utils.nativeValueToBlock;
 import static io.prestosql.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
@@ -73,7 +76,16 @@ public class TileDBSplitManager
 
         TileDBTableHandle tableHandle = layoutHandle.getTable();
 
-        try (Array array = new Array(tileDBClient.buildContext(session), tableHandle.getURI())) {
+        try {
+            Array array;
+            String key = getEncryptionKey(session);
+            if (key == null) {
+                array = new Array(tileDBClient.buildContext(session), tableHandle.getURI());
+            }
+            else {
+                array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), QueryType.TILEDB_READ,
+                        EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+            }
             int numSplits = TileDBSessionProperties.getSplits(session);
             if (numSplits == -1) {
                 numSplits = nodeManager.getWorkerNodes().size();

@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.tiledb;
 
+import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.testing.AbstractTestQueryFramework;
 import io.prestosql.testing.MaterializedResult;
@@ -59,6 +60,7 @@ import static io.tiledb.java.api.Layout.TILEDB_ROW_MAJOR;
 import static io.tiledb.java.api.QueryType.TILEDB_WRITE;
 import static java.lang.String.format;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 @Test(singleThreaded = true)
 public class TestTileDBQueries
@@ -548,6 +550,49 @@ public class TestTileDBQueries
     }
 
     @Test
+    public void testCreateTableEncrypted() throws Exception
+    {
+        // Integer
+        String arrayName = "test_create_encrypted";
+        String encryptionKey = "0123456789abcdeF0123456789abcdeF";
+
+        create1DVectorEncrypted(arrayName, encryptionKey);
+
+        // Try with a wrong key first, we expect this to fail
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.encryption_key", "0123456789xxxxF0123456789abcdeF")
+                        .build())) {
+            runner.execute("SELECT * FROM " + arrayName);
+            fail();
+        }
+        catch (Exception e) {
+        }
+
+        try (QueryRunner runner = createTileDBQueryRunner(ImmutableMap.<String, String>builder()
+                .put("tiledb.encryption_key", encryptionKey)
+                .build())) {
+            runner.execute("SELECT * FROM " + arrayName);
+
+            String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                    "('abc', 1), ('def', 2), ('ghi', 3)", arrayName);
+
+            runner.execute(insertSql);
+
+            String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
+            MaterializedResult selectResult = runner.execute(selectSql);
+
+            assertEquals(selectResult, MaterializedResult.resultBuilder(runner.getDefaultSession(), VARCHAR, INTEGER)
+                    .row("abc", 1)
+                    .row("def", 2)
+                    .row("ghi", 3)
+                    .build());
+        }
+
+        dropArray(arrayName);
+    }
+
+    @Test
     public void testInsert()
     {
         String arrayName = "test_insert";
@@ -872,6 +917,18 @@ public class TestTileDBQueries
                 "x varchar WITH (dimension=true,filter_list='(byteshuffle), (gzip,9)'), " +
                 "a1 integer" +
                 ") WITH (uri='%s',offsets_filter_list='(bzip2,-1), (gzip,3)')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorEncrypted(String arrayName, String encryptionKey)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+
+        String createSql = format("CREATE TABLE %s(" +
+                "x varchar WITH (dimension=true), " +
+                "a1 integer" +
+                ") WITH (uri='%s',encryption_key='%s')", arrayName, arrayName, encryptionKey);
+
         queryRunner.execute(createSql);
     }
 
