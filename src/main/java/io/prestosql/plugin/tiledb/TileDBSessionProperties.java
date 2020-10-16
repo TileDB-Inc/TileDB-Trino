@@ -19,10 +19,12 @@ import io.prestosql.spi.session.PropertyMetadata;
 
 import javax.inject.Inject;
 
+import java.math.BigInteger;
 import java.util.List;
 
 import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.integerProperty;
+import static io.prestosql.spi.session.PropertyMetadata.longProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 
 public final class TileDBSessionProperties
@@ -36,6 +38,7 @@ public final class TileDBSessionProperties
     private static final String ENABLE_STATS = "enable_stats";
     private static final String TILEDB_CONFIG = "tiledb_config";
     private static final String ENCRYPTION_KEY = "encryption_key";
+    private static final String TIMESTAMP = "timestamp";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -86,6 +89,11 @@ public final class TileDBSessionProperties
                 stringProperty(
                         ENCRYPTION_KEY,
                         "TileDB array encryption key",
+                        null,
+                        false),
+                longProperty(
+                        TIMESTAMP,
+                        "TileDB array timestamp, for the time travelling feature",
                         null,
                         false));
     }
@@ -138,5 +146,15 @@ public final class TileDBSessionProperties
     public static String getEncryptionKey(ConnectorSession session)
     {
         return session.getProperty(ENCRYPTION_KEY, String.class);
+    }
+
+    public static BigInteger getTimestamp(ConnectorSession session)
+    {
+        if (session.getProperty(TIMESTAMP, Long.class) != null) {
+            return BigInteger.valueOf(Long.valueOf(session.getProperty(TIMESTAMP, Long.class)));
+        }
+        else {
+            return null;
+        }
     }
 }
