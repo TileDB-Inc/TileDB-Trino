@@ -25,10 +25,12 @@ import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.Query;
 import io.tiledb.java.api.TileDBError;
 
+import java.math.BigInteger;
 import java.util.List;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getTimestamp;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
 import static java.util.Objects.requireNonNull;
 
@@ -63,8 +65,16 @@ public class TileDBRecordSet
         requireNonNull(table, "Unable to fetch table " + split.getSchemaName() + "." + split.getTableName() + " for record set");
         try {
             String key = getEncryptionKey(session);
-            if (key != null) {
+            BigInteger timestamp = getTimestamp(session);
+
+            if (key != null && timestamp != null) {
+                array = new Array(tileDBClient.buildContext(session), table.getURI().toString(), TILEDB_READ, EncryptionType.TILEDB_AES_256_GCM, key.getBytes(), timestamp);
+            }
+            else if (key != null) {
                 array = new Array(tileDBClient.buildContext(session), table.getURI().toString(), TILEDB_READ, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+            }
+            else if (timestamp != null) {
+                array = new Array(tileDBClient.buildContext(session), table.getURI().toString(), TILEDB_READ, timestamp);
             }
             else {
                 array = new Array(tileDBClient.buildContext(session), table.getURI().toString(), TILEDB_READ);

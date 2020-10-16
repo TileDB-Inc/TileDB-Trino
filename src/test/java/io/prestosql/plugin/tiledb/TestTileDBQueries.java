@@ -37,11 +37,13 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBQueryRunner.createTileDBQueryRunner;
@@ -556,7 +558,7 @@ public class TestTileDBQueries
         String arrayName = "test_create_encrypted";
         String encryptionKey = "0123456789abcdeF0123456789abcdeF";
 
-        create1DVectorEncrypted(arrayName, encryptionKey);
+        create1DVectorStringEncrypted(arrayName, encryptionKey);
 
         // Try with a wrong key first, we expect this to fail
         try (QueryRunner runner = createTileDBQueryRunner(
@@ -587,6 +589,204 @@ public class TestTileDBQueries
                     .row("def", 2)
                     .row("ghi", 3)
                     .build());
+        }
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testTimeTraveling() throws Exception
+    {
+        // BigInt
+        String arrayName = "test_create_bigint";
+        dropArray(arrayName);
+        create1DVector(arrayName);
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0, 10), (1, 13)", arrayName);
+
+        getQueryRunner().execute(insertSql);
+
+        insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(2, 2), (3, 13)", arrayName);
+
+        getQueryRunner().execute(insertSql);
+
+        insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(4, 2100), (5, 3600)", arrayName);
+
+        getQueryRunner().execute(insertSql);
+
+        // Retrieve all fragments and sort them in ascending order
+        String[] dirs = new File(arrayName).list(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name)
+            {
+                return new File(dir, name).isDirectory() && !name.equals("__meta");
+            }
+        });
+        Arrays.sort(dirs);
+
+        /* Open each fragment and validate its data */
+
+        // Check the first fragment
+        String ts1 = dirs[0].split("\\_")[2];
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.timestamp", ts1)
+                        .build())) {
+            MaterializedResult r = runner.execute("SELECT * FROM " + arrayName + " ORDER BY x");
+
+            assertEquals(r, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                    .row(0L, 10)
+                    .row(1L, 13)
+                    .build());
+        }
+        catch (Exception e) {
+        }
+
+        // Check the second fragment
+        String ts2 = dirs[1].split("\\_")[2];
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.timestamp", ts2)
+                        .build())) {
+            MaterializedResult r = runner.execute("SELECT * FROM " + arrayName + " ORDER BY x");
+
+            assertEquals(r, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                    .row(0L, 10)
+                    .row(1L, 13)
+                    .row(2L, 2)
+                    .row(3L, 13)
+                    .build());
+        }
+        catch (Exception e) {
+        }
+
+        // Check the third fragment
+        String ts3 = dirs[2].split("\\_")[2];
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.timestamp", ts3)
+                        .build())) {
+            MaterializedResult r = runner.execute("SELECT * FROM " + arrayName + " ORDER BY x");
+
+            assertEquals(r, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                    .row(0L, 10)
+                    .row(1L, 13)
+                    .row(2L, 2)
+                    .row(3L, 13)
+                    .row(4L, 2100)
+                    .row(5L, 3600)
+                    .build());
+        }
+        catch (Exception e) {
+        }
+
+        dropArray(arrayName);
+    }
+
+    @Test
+    public void testTimeTravelingEncrypted() throws Exception
+    {
+        // BigInt
+        String arrayName = "test_create_bigint";
+        String encryptionKey = "0123456789abcdeF0123456789abcdeF";
+        create1DVectorEncrypted(arrayName, encryptionKey);
+
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.encryption_key", encryptionKey)
+                        .build())) {
+            String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                    "(0, 10), (1, 13)", arrayName);
+
+            runner.execute(insertSql);
+
+            insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                    "(2, 2), (3, 13)", arrayName);
+
+            runner.execute(insertSql);
+
+            insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                    "(4, 2100), (5, 3600)", arrayName);
+
+            runner.execute(insertSql);
+        }
+        catch (Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+        }
+
+        // Retrieve all fragments and sort them in ascending order
+        String[] dirs = new File(arrayName).list(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name)
+            {
+                return new File(dir, name).isDirectory() && !name.equals("__meta");
+            }
+        });
+        Arrays.sort(dirs);
+
+        /* Open each fragment and validate its data */
+
+        // Check the first fragment
+        String ts1 = dirs[0].split("\\_")[2];
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.timestamp", ts1)
+                        .put("tiledb.encryption_key", encryptionKey)
+                        .build())) {
+            MaterializedResult r = runner.execute("SELECT * FROM " + arrayName + " ORDER BY x");
+
+            assertEquals(r, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                    .row(0L, 10)
+                    .row(1L, 13)
+                    .build());
+        }
+        catch (Exception e) {
+            fail(e.getMessage());
+        }
+
+        // Check the second fragment
+        String ts2 = dirs[1].split("\\_")[2];
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.timestamp", ts2)
+                        .put("tiledb.encryption_key", encryptionKey)
+                        .build())) {
+            MaterializedResult r = runner.execute("SELECT * FROM " + arrayName + " ORDER BY x");
+
+            assertEquals(r, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                    .row(0L, 10)
+                    .row(1L, 13)
+                    .row(2L, 2)
+                    .row(3L, 13)
+                    .build());
+        }
+        catch (Exception e) {
+            fail(e.getMessage());
+        }
+
+        // Check the third fragment
+        String ts3 = dirs[2].split("\\_")[2];
+        try (QueryRunner runner = createTileDBQueryRunner(
+                ImmutableMap.<String, String>builder()
+                        .put("tiledb.timestamp", ts3)
+                        .put("tiledb.encryption_key", encryptionKey)
+                        .build())) {
+            MaterializedResult r = runner.execute("SELECT * FROM " + arrayName + " ORDER BY x");
+
+            assertEquals(r, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                    .row(0L, 10)
+                    .row(1L, 13)
+                    .row(2L, 2)
+                    .row(3L, 13)
+                    .row(4L, 2100)
+                    .row(5L, 3600)
+                    .build());
+        }
+        catch (Exception e) {
+            fail(e.getMessage());
         }
 
         dropArray(arrayName);
@@ -820,6 +1020,16 @@ public class TestTileDBQueries
         queryRunner.execute(createSql);
     }
 
+    private void create1DVectorEncrypted(String arrayName, String encryptionKey)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x bigint WITH (dimension=true), " +
+                "a1 integer" +
+                ") WITH (uri='%s', encryption_key='%s')", arrayName, arrayName, encryptionKey);
+        queryRunner.execute(createSql);
+    }
+
     private void create1DVectorTinyIntDimension(String arrayName)
     {
         QueryRunner queryRunner = getQueryRunner();
@@ -920,7 +1130,7 @@ public class TestTileDBQueries
         queryRunner.execute(createSql);
     }
 
-    private void create1DVectorEncrypted(String arrayName, String encryptionKey)
+    private void create1DVectorStringEncrypted(String arrayName, String encryptionKey)
     {
         QueryRunner queryRunner = getQueryRunner();
 
