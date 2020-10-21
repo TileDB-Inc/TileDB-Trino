@@ -296,6 +296,42 @@ public class TestTileDBQueries
     }
 
     @Test
+    public void testCreateHeterogeneousDimensions()
+    {
+        // Integer
+        String arrayName = "test_create_heterogeneous";
+        dropArray(arrayName);
+        createHeterogeneousDimensions(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "varchar", "", "Dimension")
+                        .row("y", "integer", "", "Dimension")
+                        .row("z", "double", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .build());
+
+        String insertSql = format("INSERT INTO %s (x, y, z, a1) VALUES " +
+                "('abc', 1, 1.0, 1), ('def', 2, 3.0, 2), ('ghi', 3, 4.0, 3), ('ppp', 4, 1.0, 1)", arrayName);
+
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s ORDER BY y ASC", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, INTEGER, DOUBLE, INTEGER)
+                .row("abc", 1, 1.0, 1)
+                .row("def", 2, 3.0, 2)
+                .row("ghi", 3, 4.0, 3)
+                .row("ppp", 4, 1.0, 1)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
     public void testCreate1DVectorTimestamp()
     {
         // Integer
@@ -1105,6 +1141,18 @@ public class TestTileDBQueries
         QueryRunner queryRunner = getQueryRunner();
         String createSql = format("CREATE TABLE %s(" +
                 "x varchar WITH (dimension=true), " +
+                "a1 integer" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void createHeterogeneousDimensions(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x varchar WITH (dimension=true), " +
+                "y integer WITH (dimension=true), " +
+                "z double WITH (dimension=true), " +
                 "a1 integer" +
                 ") WITH (uri='%s')", arrayName, arrayName);
         queryRunner.execute(createSql);
