@@ -2,14 +2,21 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
     <parent>
         <artifactId>presto-root</artifactId>
-        <groupId>io.prestosql</groupId>
-        <version>340</version>
+        <groupId>com.facebook.presto</groupId>
+        <version>0.250</version>
     </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <properties>
+        <dep.airlift.version>0.198</dep.airlift.version>
+        <dep.prestodb.version>0.250</dep.prestodb.version>
+    </properties>
 
     <artifactId>presto-tiledb</artifactId>
+    <name>presto-tiledb</name>
+    <packaging>presto-plugin</packaging>
     <description>Presto - TileDB Connector</description>
 
     <repositories>
@@ -27,23 +34,27 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.airlift</groupId>
+            <groupId>com.facebook.airlift</groupId>
             <artifactId>bootstrap</artifactId>
+            <version>${dep.airlift.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>io.airlift</groupId>
+            <groupId>com.facebook.airlift</groupId>
             <artifactId>configuration</artifactId>
+            <version>0.200</version>
         </dependency>
 
         <dependency>
-            <groupId>io.airlift</groupId>
+            <groupId>com.facebook.airlift</groupId>
             <artifactId>json</artifactId>
+            <version>${dep.airlift.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>io.airlift</groupId>
+            <groupId>com.facebook.airlift</groupId>
             <artifactId>log</artifactId>
+            <version>${dep.airlift.version}</version>
         </dependency>
 
         <dependency>
@@ -104,8 +115,9 @@
 
         <!-- Presto SPI -->
         <dependency>
-            <groupId>io.prestosql</groupId>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
+            <version>${dep.prestodb.version}</version>
             <scope>provided</scope>
             <!-- https://mvnrepository.com/artifact/commons-beanutils/commons-beanutils -->
             <exclusions>
@@ -134,36 +146,49 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- for testing -->
         <dependency>
-            <groupId>io.prestosql</groupId>
+            <groupId>com.facebook.drift</groupId>
+            <artifactId>drift-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/io.prestosql/presto-testing -->
-        <dependency>
-            <groupId>io.prestosql</groupId>
-            <artifactId>presto-testing</artifactId>
-            <version>340</version>
+            <version>${dep.prestodb.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
-            <groupId>io.prestosql</groupId>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-tests</artifactId>
+            <version>${dep.prestodb.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
-            <groupId>io.prestosql</groupId>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-tpch</artifactId>
+            <version>${dep.prestodb.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
-            <groupId>io.airlift</groupId>
+            <groupId>com.facebook.airlift</groupId>
             <artifactId>testing</artifactId>
+            <version>${dep.airlift.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -214,8 +239,8 @@
                     <transformers>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                            <resource>META-INF/services/io.prestosql.spi.Plugin</resource>
-                            <file>src/main/resources/services/io.prestosql.spi.Plugin</file>
+                            <resource>META-INF/services/com.facebook.presto.spi.Plugin</resource>
+                            <file>src/main/resources/services/com.facebook.presto.spi.Plugin</file>
                         </transformer>
                     </transformers>
                 </configuration>

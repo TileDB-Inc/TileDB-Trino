@@ -39,3 +39,8 @@ steps:
         done;
     condition: failed() # only run this job if the build step failed
     displayName: "Print log files (failed build only)"
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'JUnit' # Options: JUnit, NUnit, VSTest, xUnit, cTest
+      testResultsFiles: '**/TEST-*.xml'
