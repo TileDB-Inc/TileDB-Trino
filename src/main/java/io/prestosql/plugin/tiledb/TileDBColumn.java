@@ -39,6 +39,7 @@ public final class TileDBColumn
     private final Datatype tileDBType;
     private final Boolean isVariableLength;
     private final Boolean isDimension;
+    private final Boolean isNullable;
 
     @JsonCreator
     public TileDBColumn(
@@ -46,7 +47,8 @@ public final class TileDBColumn
             @JsonProperty("type") Type type,
             @JsonProperty("TileDBType") Datatype tileDBType,
             @JsonProperty("isVariableLength") Boolean isVariableLength,
-            @JsonProperty("isDimension") Boolean isDimension)
+            @JsonProperty("isDimension") Boolean isDimension,
+            @JsonProperty("isNullable") Boolean isNullable)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or is empty");
         this.name = name;
@@ -54,12 +56,24 @@ public final class TileDBColumn
         this.tileDBType = requireNonNull(tileDBType, "TileDBType is null");
         this.isVariableLength = requireNonNull(isVariableLength, "isVariableLength is null");
         this.isDimension = requireNonNull(isDimension, "isDimension is null");
+        if (isNullable == null) {
+            this.isNullable = false;
+        }
+        else {
+            this.isNullable = isNullable;
+        }
     }
 
     @JsonProperty
     public String getName()
     {
         return name;
+    }
+
+    @JsonProperty
+    public Boolean getNullable()
+    {
+        return isNullable;
     }
 
     @JsonProperty
@@ -89,7 +103,7 @@ public final class TileDBColumn
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, type, isDimension);
+        return Objects.hash(name, type, isNullable, isDimension);
     }
 
     @Override
@@ -105,6 +119,7 @@ public final class TileDBColumn
         TileDBColumn other = (TileDBColumn) obj;
         return Objects.equals(this.name, other.name) &&
                 Objects.equals(this.type, other.type) &&
+                Objects.equals(this.isNullable, other.isNullable) &&
                 Objects.equals(this.isDimension, other.isDimension);
     }
 

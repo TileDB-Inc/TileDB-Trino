@@ -29,6 +29,7 @@ import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 public class TileDBColumnProperties
 {
     public static final String Dimension = "dimension";
+    public static final String Nullable = "nullable";
     public static final String LowerBound = "lower_bound";
     public static final String UpperBound = "upper_bound";
     public static final String Extent = "extent";
@@ -42,6 +43,11 @@ public class TileDBColumnProperties
                 booleanProperty(
                         Dimension,
                         "Is column a dimension?",
+                        false,
+                        false),
+                booleanProperty(
+                        Nullable,
+                        "Is column nullable?",
                         false,
                         false),
                 longProperty(

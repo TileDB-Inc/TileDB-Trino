@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.testing.AbstractTestQueryFramework;
 import io.prestosql.testing.MaterializedResult;
+import io.prestosql.testing.MaterializedRow;
 import io.prestosql.testing.QueryRunner;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
@@ -29,21 +30,28 @@ import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.Domain;
 import io.tiledb.java.api.FilterList;
 import io.tiledb.java.api.GzipFilter;
+import io.tiledb.java.api.NativeArray;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.Query;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FilenameFilter;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBQueryRunner.createTileDBQueryRunner;
@@ -58,6 +66,8 @@ import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
+import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
+import static io.tiledb.java.api.Layout.TILEDB_GLOBAL_ORDER;
 import static io.tiledb.java.api.Layout.TILEDB_ROW_MAJOR;
 import static io.tiledb.java.api.QueryType.TILEDB_WRITE;
 import static java.lang.String.format;
@@ -69,6 +79,25 @@ public class TestTileDBQueries
         extends AbstractTestQueryFramework
 {
     private Context ctx;
+    private String denseURI;
+    private String sparseURI;
+
+    @BeforeClass
+    public void setup() throws Exception
+    {
+        denseURI = "dense_array";
+        sparseURI = "sparse_array";
+        if (Files.exists(Paths.get(denseURI))) {
+            TileDBObject.remove(ctx, denseURI);
+        }
+        denseArrayNullableCreate();
+        denseArrayNullableWrite();
+        if (Files.exists(Paths.get(sparseURI))) {
+            TileDBObject.remove(ctx, sparseURI);
+        }
+        sparseArrayNullableCreate();
+        sparseArrayNullableWrite();
+    }
 
     public TestTileDBQueries()
     {
@@ -88,8 +117,14 @@ public class TestTileDBQueries
     }
 
     @AfterClass(alwaysRun = true)
-    public final void destroy()
+    public final void destroy() throws TileDBError
     {
+        if (Files.exists(Paths.get(denseURI))) {
+            TileDBObject.remove(ctx, denseURI);
+        }
+        if (Files.exists(Paths.get(sparseURI))) {
+            TileDBObject.remove(ctx, sparseURI);
+        }
     }
 
     @Test
@@ -1045,6 +1080,241 @@ public class TestTileDBQueries
         dropArray(arrayName);
         dropArray(insertArrayName);
     }
+    /*
+    =======================================================
+    Nullable attributes begin
+    ======================================================
+     */
+
+    /**
+     * Dense array with nullable and fixed size attributes.
+     *
+     * @throws Exception
+     */
+    private void denseArrayNullableCreate() throws Exception
+    {
+        Dimension<Integer> rows =
+                new Dimension<>(ctx, "rows", Integer.class, new Pair<Integer, Integer>(1, 2), 2);
+        Dimension<Integer> cols =
+                new Dimension<>(ctx, "cols", Integer.class, new Pair<Integer, Integer>(1, 2), 2);
+
+        // Create and set getDomain
+        Domain domain = new Domain(ctx);
+        domain.addDimension(rows);
+        domain.addDimension(cols);
+
+        Attribute a1 = new Attribute(ctx, "a1", Float.class);
+        Attribute a2 = new Attribute(ctx, "a2", Integer.class);
+        a2.setCellValNum(1);
+
+        a1.setNullable(true);
+        a2.setNullable(true);
+
+        ArraySchema schema = new ArraySchema(ctx, TILEDB_DENSE);
+        schema.setTileOrder(TILEDB_ROW_MAJOR);
+        schema.setCellOrder(TILEDB_ROW_MAJOR);
+        schema.setDomain(domain);
+        schema.addAttribute(a1);
+        schema.addAttribute(a2);
+
+        Array.create(denseURI, schema);
+    }
+
+    /**
+     * Populating the dense array with nullable attributes.
+     * @throws Exception
+     */
+    private void denseArrayNullableWrite() throws Exception
+    {
+        // Prepare cell buffers
+        NativeArray a1 = new NativeArray(ctx, new float[] {2.0f, 3.0f, 4.0f, 1.0f}, Float.class);
+        NativeArray a2 = new NativeArray(ctx, new int[] {1, 4, 2, 2}, Integer.class);
+
+        // Create query
+        try (Array array = new Array(ctx, denseURI, TILEDB_WRITE); Query query = new Query(array)) {
+            query.setLayout(TILEDB_ROW_MAJOR);
+            NativeArray a1Bytemap = new NativeArray(ctx, new short[] {0, 1, 1, 0}, Datatype.TILEDB_UINT8);
+            NativeArray a2Bytemap = new NativeArray(ctx, new short[] {1, 1, 0, 1}, Datatype.TILEDB_UINT8);
+
+            query.setBufferNullable("a1", a1, a1Bytemap);
+            query.setBufferNullable("a2", a2, a2Bytemap);
+
+            // Submit query
+            query.submit();
+        }
+    }
+
+    /**
+     * Reads a two-dimensional dense array with nullable attributes.
+     */
+    @Test
+    public void testRead2DVectorNullableDense()
+    {
+        String selectSql = format("SELECT * FROM %s", denseURI);
+        MaterializedResult selectResult = computeActual(selectSql);
+        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), DOUBLE, INTEGER)
+                .row(1, 2, 3.0, 4)
+                .row(1, 1, null, 1)
+                .row(2, 1, 4.0, null)
+                .row(2, 2, null, 2)
+                .build();
+        //using string representation because of null values
+        List<MaterializedRow> expectedRows = expected.getMaterializedRows();
+        List<String> resultRowsToString = resultRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        List<String> expectedRowsToString = expectedRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
+    }
+
+    /**
+     * Sparse array with nullable and variable sized attributes.
+     *
+     * @throws TileDBError
+     */
+    private void sparseArrayNullableCreate() throws TileDBError
+    {
+        Dimension<Integer> d1 =
+                new Dimension<>(ctx, "d1", Integer.class, new Pair<Integer, Integer>(1, 8), 2);
+
+        // Create and set getDomain
+        Domain domain = new Domain(ctx);
+        domain.addDimension(d1);
+
+        Attribute a1 = new Attribute(ctx, "a1", Integer.class);
+        Attribute a2 = new Attribute(ctx, "a2", Datatype.TILEDB_STRING_ASCII);
+        a2.setCellVar();
+
+        a1.setNullable(true);
+        a2.setNullable(true);
+
+        ArraySchema schema = new ArraySchema(ctx, TILEDB_SPARSE);
+        schema.setTileOrder(TILEDB_ROW_MAJOR);
+        schema.setCellOrder(TILEDB_ROW_MAJOR);
+        schema.setDomain(domain);
+        schema.addAttribute(a1);
+        schema.addAttribute(a2);
+
+        Array.create(sparseURI, schema);
+    }
+
+    /**
+     * Populating the sparse array with nullable attributes.
+     * @throws TileDBError
+     */
+    private void sparseArrayNullableWrite() throws TileDBError
+    {
+        NativeArray data = new NativeArray(ctx, new int[] {1, 2, 3, 4, 5}, Integer.class);
+
+        // Prepare cell buffers
+        NativeArray a1 = new NativeArray(ctx, new int[] {1, 2, 3, 4, 5}, Integer.class);
+
+        NativeArray a2Data = new NativeArray(ctx, "aabbccddee", Datatype.TILEDB_STRING_ASCII);
+        NativeArray a2Off = new NativeArray(ctx, new long[] {0, 2, 4, 6, 8}, Datatype.TILEDB_UINT64);
+
+        // Create query
+        Array array = new Array(ctx, sparseURI, TILEDB_WRITE);
+        Query query = new Query(array);
+        query.setLayout(TILEDB_GLOBAL_ORDER);
+
+        NativeArray a1ByteMap =
+                new NativeArray(ctx, new short[] {0, 0, 0, 1, 1}, Datatype.TILEDB_UINT8);
+        NativeArray a2ByteMap =
+                new NativeArray(ctx, new short[] {1, 1, 1, 0, 0}, Datatype.TILEDB_UINT8);
+
+        query.setBuffer("d1", data);
+        query.setBufferNullable("a1", a1, a1ByteMap);
+        query.setBufferNullable("a2", a2Off, a2Data, a2ByteMap);
+
+        // Submit query
+        query.submit();
+
+        query.finalizeQuery();
+        query.close();
+        array.close();
+    }
+
+    /**
+     * Reads a two-dimensional sparse array with nullable attributes.
+     */
+    @Test
+    public void testRead2DVectorNullableSparse()
+    {
+        String selectSql = format("SELECT * FROM %s", sparseURI);
+        MaterializedResult selectResult = computeActual(selectSql);
+        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
+//        for (MaterializedRow row : resultRows) {
+//            System.out.println(row);
+//        }
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, VARCHAR)
+                .row(1, null, "aa")
+                .row(2, null, "bb")
+                .row(3, null, "cc")
+                .row(4, 4, null)
+                .row(5, 5, null)
+                .build();
+        //using string representation because of null values
+        List<MaterializedRow> expectedRows = expected.getMaterializedRows();
+        List<String> resultRowsToString = resultRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        List<String> expectedRowsToString = expectedRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
+    }
+
+    /**
+     * Writes an one-dimensional array with nullable attributes.
+     */
+    @Test
+    public void testWrite1DVectorNullableSparse()
+    {
+        String arrayName = "test_create_nullable";
+        dropArray(arrayName);
+        create1DVectorNullableSparse(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "bigint", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .build());
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0, 3), (3, null), (5, null)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
+//        for (MaterializedRow row : resultRows){
+//            System.out.println(row);
+//        }
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER)
+                .row(0, 3)
+                .row(3, null)
+                .row(5, null)
+                .build();
+        //using string representation because of null values
+        List<MaterializedRow> expectedRows = expected.getMaterializedRows();
+        List<String> resultRowsToString = resultRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        List<String> expectedRowsToString = expectedRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
+        dropArray(arrayName);
+    }
+    /*
+    =======================================================
+    Nullable attributes end
+    ======================================================
+     */
 
     private void create1DVector(String arrayName)
     {
@@ -1053,6 +1323,26 @@ public class TestTileDBQueries
                 "x bigint WITH (dimension=true), " +
                 "a1 integer" +
                 ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorNullableSparse(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x bigint WITH (dimension=true), " +
+                "a1 integer WITH (nullable=true)" +
+                ") WITH (uri='%s')", arrayName, arrayName); //SPARSE is the default value
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorNullableDense(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x bigint WITH (dimension=true), " +
+                "a1 integer WITH (nullable=true)" +
+                ") WITH (uri='%s', type='%s')", arrayName, arrayName, "DENSE");
         queryRunner.execute(createSql);
     }
 

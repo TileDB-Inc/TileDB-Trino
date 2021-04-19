@@ -308,7 +308,7 @@ public class TileDBMetadata
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
         for (TileDBColumn column : table.getColumns()) {
             // Create column handles, extra info contains a boolean for if its a dimension (true) or attribute (false)
-            columnHandles.put(column.getName(), new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getTileDBType(), column.getIsVariableLength(), column.getIsDimension()));
+            columnHandles.put(column.getName(), new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getTileDBType(), column.getIsVariableLength(), column.getIsDimension(), column.getNullable()));
         }
         return columnHandles.build();
     }
@@ -586,7 +586,7 @@ public class TileDBMetadata
                     if (filterPairs.isPresent()) {
                         attribute.setFilterList(Util.createTileDBFilterList(localCtx, filterPairs.get()));
                     }
-
+                    attribute.setNullable(column.isNullable());
                     arraySchema.addAttribute(attribute);
                 }
 
@@ -646,7 +646,7 @@ public class TileDBMetadata
             for (TileDBColumn column : tileDBTable.getColumns()) {
                 for (int i = 0; i < columnNames.size(); i++) {
                     if (column.getName().toLowerCase(Locale.ENGLISH).equals(columnNames.get(i))) {
-                        columnHandles.set(i, new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getTileDBType(), column.getIsVariableLength(), column.getIsDimension()));
+                        columnHandles.set(i, new TileDBColumnHandle(connectorId, column.getName(), column.getType(), column.getTileDBType(), column.getIsVariableLength(), column.getIsDimension(), column.getNullable()));
                     }
                 }
             }
