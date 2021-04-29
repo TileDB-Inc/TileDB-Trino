@@ -349,13 +349,13 @@ public class TileDBRecordCursor
         if (bufferSize > initialMaxBufferSize || bufferSize < 0) {
             return initialMaxBufferSize / elementBytes;
         }
-        return numElements;
+        return bufferSize;
     }
 
     /**
      * Build the ranges for a query based on the split
      *
-     * @param split         the split to build the subArray based off of
+     * @param split the split to build the subArray based off of
      * @return
      */
     private void setRanges(TileDBSplit split) throws TileDBError
