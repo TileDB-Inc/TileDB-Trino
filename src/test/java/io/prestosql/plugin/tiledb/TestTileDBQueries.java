@@ -1282,22 +1282,25 @@ public class TestTileDBQueries
                 MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                         .row("x", "bigint", "", "Dimension")
                         .row("a1", "integer", "", "Attribute")
+                        .row("a2", "integer", "", "Attribute")
                         .build());
 
-        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
-                "(0, 3), (3, null), (5, null)", arrayName);
+        String insertSql = format("INSERT INTO %s (x, a1, a2) VALUES " +
+                "(0, 3, null), (3, 6, null), (8, null, 5), (7, null, null)", arrayName);
         getQueryRunner().execute(insertSql);
 
         String selectSql = format("SELECT * FROM %s", arrayName);
         MaterializedResult selectResult = computeActual(selectSql);
         List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
-//        for (MaterializedRow row : resultRows){
+//        for (MaterializedRow row : resultRows) {
 //            System.out.println(row);
 //        }
+
         MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER)
-                .row(0, 3)
-                .row(3, null)
-                .row(5, null)
+                .row(0, 3, null)
+                .row(3, 6, null)
+                .row(8, null, 5)
+                .row(7, null, null)
                 .build();
         //using string representation because of null values
         List<MaterializedRow> expectedRows = expected.getMaterializedRows();
@@ -1331,7 +1334,8 @@ public class TestTileDBQueries
         QueryRunner queryRunner = getQueryRunner();
         String createSql = format("CREATE TABLE %s(" +
                 "x bigint WITH (dimension=true), " +
-                "a1 integer WITH (nullable=true)" +
+                "a1 integer WITH (nullable=true), " +
+                "a2 integer WITH (nullable=true)" +
                 ") WITH (uri='%s')", arrayName, arrayName); //SPARSE is the default value
         queryRunner.execute(createSql);
     }

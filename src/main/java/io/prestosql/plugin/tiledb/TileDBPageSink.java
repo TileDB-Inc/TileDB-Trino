@@ -92,7 +92,7 @@ public class TileDBPageSink
     // This is used specifically for fetching and storing dimensions in proper order for tiledb coordinates
     private final Map<String, Integer> columnOrder;
 
-    private short[] validityMap;
+    private short[][] validityMaps;
 
     private final TileDBOutputTableHandle table;
     private final int maxBufferSize; // Max Buffer
@@ -173,8 +173,10 @@ public class TileDBPageSink
         buffers.clear();
         query.resetBuffers();
 
+        validityMaps = new short[columnHandles.size()][maxBufferSize];
         // Loop through each column
         for (int channel = 0; channel < columnHandles.size(); channel++) {
+            Arrays.fill(validityMaps[channel], (short) 1); //all valid
             // Datatype
             Datatype type = null;
             // Is column of variable length
@@ -191,8 +193,6 @@ public class TileDBPageSink
             if (isVariableLength) {
                 offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
             }
-            validityMap = new short[maxBufferSize];
-            Arrays.fill(validityMap, (short) 1); //all valid
             buffers.put(columnName, new Pair<>(offsets, values));
         }
     }
@@ -315,6 +315,15 @@ public class TileDBPageSink
                 isNullable = attribute.getNullable();
             }
 
+            int channel = 0;
+            int i = 0;
+            for (TileDBColumnHandle columnHandle : columnHandles) {
+                if (columnHandle.getColumnName().equals(name)) {
+                    channel = i; //find the column index to locate the validity map.
+                }
+                i++;
+            }
+
             NativeArray offsets = bufferEntry.getValue().getFirst();
             NativeArray values = bufferEntry.getValue().getSecond();
             // LastValuePosition holds the position of the last element in the buffer
@@ -337,7 +346,7 @@ public class TileDBPageSink
                     buffersToClear.add(offsets);
                 }
                 if (isNullable) {
-                    query.setBufferNullable(bufferEntry.getKey(), offsets, values, new NativeArray(ctx, validityMap, Datatype.TILEDB_UINT8));
+                    query.setBufferNullable(bufferEntry.getKey(), offsets, values, new NativeArray(ctx, validityMaps[channel], Datatype.TILEDB_UINT8));
                 }
                 else {
                     query.setBuffer(bufferEntry.getKey(), offsets, values);
@@ -345,7 +354,7 @@ public class TileDBPageSink
             }
             else {
                 if (isNullable) {
-                    query.setBufferNullable(bufferEntry.getKey(), values, new NativeArray(ctx, validityMap, Datatype.TILEDB_UINT8));
+                    query.setBufferNullable(bufferEntry.getKey(), values, new NativeArray(ctx, validityMaps[channel], Datatype.TILEDB_UINT8));
                 }
                 else {
                     query.setBuffer(bufferEntry.getKey(), values);
@@ -380,7 +389,7 @@ public class TileDBPageSink
         Datatype colType;
 
         if (block.isNull(position)) {
-            validityMap[bufferPosition] = 0;
+            validityMaps[channel][bufferPosition] = 0;
         }
 
         if (dataTypeCache.containsKey(channel)) {
