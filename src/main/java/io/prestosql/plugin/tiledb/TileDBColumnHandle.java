@@ -40,6 +40,7 @@ public final class TileDBColumnHandle
     private final Datatype columnTileDBType;
     private final boolean isVariableLength;
     private final boolean isDimension;
+    private final boolean isNullable;
 
     @JsonCreator
     public TileDBColumnHandle(
@@ -48,7 +49,8 @@ public final class TileDBColumnHandle
             @JsonProperty("columnType") Type columnType,
             @JsonProperty("columnTileDBType") Datatype columnTileDBType,
             @JsonProperty("isVariableLength") Boolean isVariableLength,
-            @JsonProperty("isDimension") Boolean isDimension)
+            @JsonProperty("isDimension") Boolean isDimension,
+            @JsonProperty("isNullable") Boolean isNullable)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.columnName = requireNonNull(columnName, "columnName is null");
@@ -56,6 +58,12 @@ public final class TileDBColumnHandle
         this.columnTileDBType = requireNonNull(columnTileDBType, "columnTileDBType is null");
         this.isVariableLength = requireNonNull(isVariableLength, "isVariableLength is null");
         this.isDimension = requireNonNull(isDimension, "isDimension is null");
+        if (isNullable == null) {
+            this.isNullable = false;
+        }
+        else {
+            this.isNullable = isNullable;
+        }
     }
 
     @JsonProperty
@@ -94,6 +102,12 @@ public final class TileDBColumnHandle
         return isDimension;
     }
 
+    @JsonProperty
+    public Boolean getNullable()
+    {
+        return isNullable;
+    }
+
     public ColumnMetadata getColumnMetadata()
     {
         return new ColumnMetadata(columnName, columnType);
@@ -102,7 +116,7 @@ public final class TileDBColumnHandle
     @Override
     public int hashCode()
     {
-        return Objects.hash(connectorId, columnName, columnType, isDimension);
+        return Objects.hash(connectorId, columnName, columnType, isNullable, isDimension);
     }
 
     @Override
@@ -119,6 +133,7 @@ public final class TileDBColumnHandle
         return Objects.equals(this.connectorId, other.connectorId) &&
                 Objects.equals(this.columnName, other.columnName) &&
                 Objects.equals(this.columnType, other.columnType) &&
+                Objects.equals(this.isNullable, other.isNullable) &&
                 Objects.equals(this.isDimension, other.isDimension);
     }
 
@@ -131,6 +146,7 @@ public final class TileDBColumnHandle
                 .add("columnType", columnType)
                 .add("columnTileDBType", columnTileDBType)
                 .add("isVariableLength", isVariableLength)
+                .add("isNullable", isNullable)
                 .add("isDimension", isDimension)
                 .toString();
     }

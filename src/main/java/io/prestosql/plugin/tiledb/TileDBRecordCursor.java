@@ -62,6 +62,7 @@ import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getReadBufferSi
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.Datatype.TILEDB_UINT64;
+import static io.tiledb.java.api.Datatype.TILEDB_UINT8;
 import static io.tiledb.java.api.QueryStatus.TILEDB_COMPLETED;
 import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
 import static io.tiledb.java.api.QueryStatus.TILEDB_UNINITIALIZED;
@@ -121,6 +122,15 @@ public class TileDBRecordCursor
     private final Datatype[] fieldTypes;
 
     /**
+     * Attribute array so we can avoid looking up attribute names.
+     * This is indexed based on columnHandles indexing (aka query field indexes)
+     */
+    private final String[] fieldNames;
+    /**
+     * Attribute array so we can avoid looking up if an attribute is nullable.
+     */
+    private final boolean[] fieldNullables;
+    /**
      * The array schema instance. No need to close()
      */
     private final ArraySchema arraySchema;
@@ -174,6 +184,12 @@ public class TileDBRecordCursor
     private final ArrayList<Pair<NativeArray, NativeArray>> queryBuffers;
 
     /**
+     * List of validity maps used in the query object.
+     * This is indexed based on columnHandles indexing (aka query field indexes)
+     */
+    private final ArrayList<NativeArray> validityMaps;
+
+    /**
      * List of Java arrays containing query results.
      * This is indexed based on columnHandles indexing (aka query field indexes)
      */
@@ -192,6 +208,7 @@ public class TileDBRecordCursor
     /**
      * The zero-epoch OffsetDateTime
      */
+
     private static final OffsetDateTime zeroDateTime = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC);
 
     public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query)
@@ -202,10 +219,13 @@ public class TileDBRecordCursor
         this.query = query;
         int columnCount = max(this.columnHandles.size(), 1);
         this.queryBuffers = new ArrayList<>(Collections.nCopies(columnCount, null));
+        this.validityMaps = new ArrayList<>(Collections.nCopies(columnCount, null));
         this.queryResultArrays = new ArrayList<>(Collections.nCopies(columnCount, null));
         this.dimensionIndexes = new HashMap<>();
         this.columnIndexLookup = new HashMap<>();
         this.fieldTypes = new Datatype[columnCount];
+        this.fieldNames = new String[columnCount];
+        this.fieldNullables = new boolean[columnCount];
         this.queryStatus = TILEDB_UNINITIALIZED;
 
         // Set initial max buffer sizes for reads from session configuration parameter
@@ -242,13 +262,35 @@ public class TileDBRecordCursor
         for (int i = 0; i < columnHandles.size(); i++) {
             columnIndexLookup.put(columnHandles.get(i).getColumnName(), i);
         }
+        HashMap<String, Pair<Integer, Integer>> estimations = new HashMap<>();
+        String name;
 
         // Build attribute array to avoid making calls to ArraySchema.getAttribute(string)
+        //Also make result size estimations to allocate the buffers.
         for (int i = 0; i < arraySchema.getAttributeNum(); i++) {
             try (Attribute attribute = arraySchema.getAttribute(i)) {
+                name = attribute.getName();
+                if (attribute.isVar()) {
+                    if (attribute.getNullable()) {
+                        estimations.put(name, query.getEstResultSizeVarNullable(tileDBClient.getCtx(), name).getFirst());
+                    }
+                    else {
+                        estimations.put(name, query.getEstResultSizeVar(tileDBClient.getCtx(), name));
+                    }
+                }
+                else {
+                    if (attribute.getNullable()) {
+                        estimations.put(name, new Pair<>(null, query.getEstResultSizeNullable(tileDBClient.getCtx(), name).getFirst()));
+                    }
+                    else {
+                        estimations.put(name, new Pair<>(null, query.getEstResultSize(tileDBClient.getCtx(), name)));
+                    }
+                }
                 if (columnIndexLookup.containsKey(attribute.getName())) {
                     int field = columnIndexLookup.get(attribute.getName());
                     fieldTypes[field] = attribute.getType();
+                    fieldNullables[field] = attribute.getNullable();
+                    fieldNames[field] = attribute.getName();
                 }
             }
         }
@@ -262,6 +304,13 @@ public class TileDBRecordCursor
 
             for (int i = 0; i < domain.getNDim(); i++) {
                 try (Dimension dim = domain.getDimension(i)) {
+                    name = dim.getName();
+                    if (dim.isVar()) {
+                        estimations.put(name, query.getEstResultSizeVar(tileDBClient.getCtx(), name));
+                    }
+                    else {
+                        estimations.put(name, new Pair<>(null, query.getEstResultSize(tileDBClient.getCtx(), name)));
+                    }
                     if (columnIndexLookup.containsKey(dim.getName())) {
                         int field = columnIndexLookup.get(dim.getName());
                         fieldTypes[field] = dim.getType();
@@ -269,17 +318,13 @@ public class TileDBRecordCursor
                 }
             }
         }
-
         // Build ranges
         setRanges(split);
-        // Get estimated buffer sizes to build
-        HashMap<String, Pair<Integer, Integer>> maxSizes = this.query.getResultEstimations();
-
         // Compute an upper bound on the number of results in the subarray.
-        totalNumRecordsUB = maxSizes.values().iterator().next().getSecond();
+        totalNumRecordsUB = estimations.values().iterator().next().getSecond();
 
         // Build buffers for each column (attribute) in the query.
-        for (Map.Entry<String, Pair<Integer, Integer>> maxSize : maxSizes.entrySet()) {
+        for (Map.Entry<String, Pair<Integer, Integer>> maxSize : estimations.entrySet()) {
             String columnName = maxSize.getKey();
 
             // Check to see if column is in request list, if not don't set a buffer
@@ -303,6 +348,7 @@ public class TileDBRecordCursor
         Pair<Long, Long> timer = startTimer();
         boolean isAttribute = arraySchema.hasAttribute(field);
         boolean isVar;
+        boolean isNullable;
         Datatype type;
 
         // Get the datatype and if the attribute is variable-sized
@@ -310,28 +356,43 @@ public class TileDBRecordCursor
             try (io.tiledb.java.api.Domain domain = arraySchema.getDomain(); Dimension dim = domain.getDimension(field)) {
                 type = dim.getType();
                 isVar = dim.isVar();
+                isNullable = false;
             }
         }
         else {
             try (Attribute attr = arraySchema.getAttribute(field)) {
                 type = attr.getType();
                 isVar = attr.isVar();
+                isNullable = attr.getNullable();
             }
         }
 
         // Allocate a NativeBuffer for the attribute, and the offsets (for var-len attributes).
         int bufferSize = getClampedBufferSize(maxBufferElements.getSecond().intValue(), type.getNativeSize());
         NativeArray valuesBuffer = new NativeArray(tileDBClient.getCtx(), bufferSize, type);
+        NativeArray validityMap = new NativeArray(tileDBClient.getCtx(), bufferSize, TILEDB_UINT8);
 
         if (isVar) {
             // Allocate a buffer for the offsets
             bufferSize = getClampedBufferSize(maxBufferElements.getFirst().intValue(), TILEDB_UINT64.getNativeSize());
             NativeArray offsetsBuffer = new NativeArray(tileDBClient.getCtx(), bufferSize, TILEDB_UINT64);
-            query.setBuffer(field, offsetsBuffer, valuesBuffer);
             queryBuffers.set(columnIndexLookup.get(field), new Pair<>(offsetsBuffer, valuesBuffer));
+            if (isNullable) {
+                query.setBufferNullable(field, offsetsBuffer, valuesBuffer, validityMap);
+                validityMaps.set(columnIndexLookup.get(field), validityMap);
+            }
+            else {
+                query.setBuffer(field, offsetsBuffer, valuesBuffer);
+            }
         }
         else {
-            query.setBuffer(field, valuesBuffer);
+            if (isNullable) {
+                query.setBufferNullable(field, valuesBuffer, validityMap);
+                validityMaps.set(columnIndexLookup.get(field), validityMap);
+            }
+            else {
+                query.setBuffer(field, valuesBuffer);
+            }
             queryBuffers.set(columnIndexLookup.get(field), new Pair<>(null, valuesBuffer));
         }
 
@@ -672,6 +733,7 @@ public class TileDBRecordCursor
 
         for (int i = 0; i < queryBuffers.size(); i++) {
             Pair<NativeArray, NativeArray> nativeArrayPair = queryBuffers.get(i);
+            NativeArray validityMap = validityMaps.get(i);
             NativeArray offsetBuffer = nativeArrayPair.getFirst();
             NativeArray valuesBuffer = nativeArrayPair.getSecond();
             if (valuesBuffer != null) {
@@ -683,12 +745,29 @@ public class TileDBRecordCursor
                 NativeArray tmp = new NativeArray(tileDBClient.getCtx(), 2 * offsetBuffer.getSize(), TILEDB_UINT64);
                 offsetBuffer.close();
                 offsetBuffer = tmp;
-                query.setBuffer(columnHandles.get(i).getColumnName(), offsetBuffer, valuesBuffer);
+                if (validityMap != null) {
+                    NativeArray newValidity = new NativeArray(tileDBClient.getCtx(), 2 * validityMap.getSize(), TILEDB_UINT8);
+                    validityMap.close();
+                    validityMap = newValidity;
+                    query.setBufferNullable(columnHandles.get(i).getColumnName(), offsetBuffer, valuesBuffer, validityMap);
+                    validityMaps.set(i, validityMap);
+                }
+                else {
+                    query.setBuffer(columnHandles.get(i).getColumnName(), offsetBuffer, valuesBuffer);
+                }
             }
             else {
-                query.setBuffer(columnHandles.get(i).getColumnName(), valuesBuffer);
+                if (validityMap != null) {
+                    NativeArray newValidity = new NativeArray(tileDBClient.getCtx(), 2 * validityMap.getSize(), TILEDB_UINT8);
+                    validityMap.close();
+                    validityMap = newValidity;
+                    query.setBufferNullable(columnHandles.get(i).getColumnName(), valuesBuffer, validityMap);
+                    validityMaps.set(i, validityMap);
+                }
+                else {
+                    query.setBuffer(columnHandles.get(i).getColumnName(), valuesBuffer);
+                }
             }
-
             queryBuffers.set(i, new Pair<>(offsetBuffer, valuesBuffer));
         }
 
@@ -1079,9 +1158,18 @@ public class TileDBRecordCursor
     @Override
     public boolean isNull(int field)
     {
-        checkState(!closed, "cursor is closed");
-        checkArgument(field < columnHandles.size(), "Invalid field index");
-        // TileDB does not allow null values
+        short[] validityByteMap;
+        boolean nullable = fieldNullables[field];
+        String name = fieldNames[field];
+        if (nullable) {
+            try {
+                validityByteMap = query.getValidityByteMap(name);
+                return validityByteMap[cursorPosition] == 0;
+            }
+            catch (TileDBError tileDBError) {
+                LOG.error("Error retrieving validity map of attribute: " + name);
+            }
+        }
         return false;
     }
 

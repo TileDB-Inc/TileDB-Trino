@@ -26,6 +26,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
+import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.EncryptionType;
@@ -44,6 +45,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -89,6 +91,8 @@ public class TileDBPageSink
     // ColumnOrder holds the `channel` number for a column
     // This is used specifically for fetching and storing dimensions in proper order for tiledb coordinates
     private final Map<String, Integer> columnOrder;
+
+    private short[] validityMap;
 
     private final TileDBOutputTableHandle table;
     private final int maxBufferSize; // Max Buffer
@@ -187,6 +191,8 @@ public class TileDBPageSink
             if (isVariableLength) {
                 offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
             }
+            validityMap = new short[maxBufferSize];
+            Arrays.fill(validityMap, (short) 1); //all valid
             buffers.put(columnName, new Pair<>(offsets, values));
         }
     }
@@ -194,7 +200,7 @@ public class TileDBPageSink
     /**
      * appendPage adds the rows
      * @param page rows/columns to insert
-     * @return Future not currently used, but could be for async writing
+     * @return Future not currently used, but could be for async writing. It does support nullable attributes for now.
      */
     @Override
     public CompletableFuture<?> appendPage(Page page)
@@ -299,12 +305,14 @@ public class TileDBPageSink
         for (Map.Entry<String, Pair<NativeArray, NativeArray>> bufferEntry : buffers.entrySet()) {
             Datatype nativeType;
             String name = bufferEntry.getKey();
-
+            boolean isNullable = false;
             if (array.getSchema().getDomain().hasDimension(name)) {
                 nativeType = array.getSchema().getDomain().getDimension(name).getType();
             }
             else {
-                nativeType = array.getSchema().getAttribute(name).getType();
+                Attribute attribute = array.getSchema().getAttribute(name);
+                nativeType = attribute.getType();
+                isNullable = attribute.getNullable();
             }
 
             NativeArray offsets = bufferEntry.getValue().getFirst();
@@ -328,10 +336,20 @@ public class TileDBPageSink
                     offsets = new NativeArray(ctx, offsets.toJavaArray(toIntExact(effectiveElementsInOffsetBuffers)), Datatype.TILEDB_UINT64);
                     buffersToClear.add(offsets);
                 }
-                query.setBuffer(bufferEntry.getKey(), offsets, values);
+                if (isNullable) {
+                    query.setBufferNullable(bufferEntry.getKey(), offsets, values, new NativeArray(ctx, validityMap, Datatype.TILEDB_UINT8));
+                }
+                else {
+                    query.setBuffer(bufferEntry.getKey(), offsets, values);
+                }
             }
             else {
-                query.setBuffer(bufferEntry.getKey(), values);
+                if (isNullable) {
+                    query.setBufferNullable(bufferEntry.getKey(), values, new NativeArray(ctx, validityMap, Datatype.TILEDB_UINT8));
+                }
+                else {
+                    query.setBuffer(bufferEntry.getKey(), values);
+                }
             }
         }
         // Set the coordinates and submit
@@ -358,12 +376,12 @@ public class TileDBPageSink
     {
         OffsetDateTime dt;
         Block block = page.getBlock(channel);
-        if (block.isNull(position)) {
-            throw new TileDBError("Null values not allowed for insert. Error in table " + table.getTableName() + ", column " + columnHandles.get(channel).getColumnName() + ", row " + position);
-        }
-
         String colName = columnHandles.get(channel).getColumnName();
         Datatype colType;
+
+        if (block.isNull(position)) {
+            validityMap[bufferPosition] = 0;
+        }
 
         if (dataTypeCache.containsKey(channel)) {
             colType = dataTypeCache.get(channel);
