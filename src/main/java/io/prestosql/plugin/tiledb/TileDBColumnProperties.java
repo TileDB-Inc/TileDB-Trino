@@ -86,6 +86,11 @@ public class TileDBColumnProperties
         return (Long) tableProperties.get(LowerBound);
     }
 
+    public static boolean getNullable(Map<String, Object> tableProperties)
+    {
+        return (boolean) tableProperties.get(Nullable);
+    }
+
     public static Long getUpperBound(Map<String, Object> tableProperties)
     {
         return (Long) tableProperties.get(UpperBound);

@@ -83,6 +83,7 @@ import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getExtent;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getFilterList;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getLowerBound;
 import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getUpperBound;
+import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getNullable;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.prestosql.plugin.tiledb.TileDBModule.tileDBTypeFromPrestoType;
@@ -586,7 +587,7 @@ public class TileDBMetadata
                     if (filterPairs.isPresent()) {
                         attribute.setFilterList(Util.createTileDBFilterList(localCtx, filterPairs.get()));
                     }
-                    attribute.setNullable(column.isNullable());
+                    attribute.setNullable(getNullable(columnProperties));
                     arraySchema.addAttribute(attribute);
                 }
 
