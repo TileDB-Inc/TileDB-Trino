@@ -13,13 +13,14 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.Page;
-import com.facebook.presto.common.block.Block;
-import com.facebook.presto.common.type.DecimalType;
-import com.facebook.presto.common.type.Type;
 import com.facebook.presto.spi.ConnectorPageSink;
 import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.type.DateType;
+import com.facebook.presto.spi.type.DecimalType;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
@@ -53,21 +54,20 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
-import static com.facebook.presto.common.type.BigintType.BIGINT;
-import static com.facebook.presto.common.type.BooleanType.BOOLEAN;
-import static com.facebook.presto.common.type.Chars.isCharType;
-import static com.facebook.presto.common.type.DateType.DATE;
-import static com.facebook.presto.common.type.Decimals.readBigDecimal;
-import static com.facebook.presto.common.type.DoubleType.DOUBLE;
-import static com.facebook.presto.common.type.IntegerType.INTEGER;
-import static com.facebook.presto.common.type.RealType.REAL;
-import static com.facebook.presto.common.type.SmallintType.SMALLINT;
-import static com.facebook.presto.common.type.TimestampType.TIMESTAMP;
-import static com.facebook.presto.common.type.TinyintType.TINYINT;
-import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
-import static com.facebook.presto.common.type.Varchars.isVarcharType;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
+import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.Chars.isCharType;
+import static com.facebook.presto.spi.type.Decimals.readBigDecimal;
+import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
+import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
+import static com.facebook.presto.spi.type.TinyintType.TINYINT;
+import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
+import static com.facebook.presto.spi.type.Varchars.isVarcharType;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -450,7 +450,7 @@ public class TileDBPageSink
         else if (VARBINARY.equals(type)) {
             columnBuffer.setItem(bufferPosition, type.getSlice(block, position).getBytes());
         }
-        else if (DATE.equals(type)) {
+        else if (DateType.DATE.equals(type)) {
             long value;
             switch (colType) {
                 case TILEDB_DATETIME_AS: {

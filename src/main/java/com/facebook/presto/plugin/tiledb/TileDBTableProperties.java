@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.spi.session.PropertyMetadata;
+import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableList;
 
 import javax.inject.Inject;

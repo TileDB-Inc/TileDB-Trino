@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.type.Type;
+import com.facebook.presto.spi.type.Type;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.tiledb.java.api.Datatype;

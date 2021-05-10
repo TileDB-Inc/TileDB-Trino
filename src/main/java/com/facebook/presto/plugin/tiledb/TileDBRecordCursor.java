@@ -14,16 +14,16 @@
 package com.facebook.presto.plugin.tiledb;
 
 import com.facebook.airlift.log.Logger;
-import com.facebook.presto.common.predicate.Domain;
-import com.facebook.presto.common.predicate.Marker;
-import com.facebook.presto.common.predicate.Range;
-import com.facebook.presto.common.predicate.TupleDomain;
-import com.facebook.presto.common.type.Type;
 import com.facebook.presto.plugin.tiledb.util.Util;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
+import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.predicate.Marker;
+import com.facebook.presto.spi.predicate.Range;
+import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.tiledb.java.api.Array;
@@ -53,10 +53,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 
-import static com.facebook.presto.common.type.RealType.REAL;
-import static com.facebook.presto.common.type.Varchars.isVarcharType;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getEnableStats;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getReadBufferSize;
+import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.Varchars.isVarcharType;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.tiledb.java.api.Datatype.TILEDB_UINT64;

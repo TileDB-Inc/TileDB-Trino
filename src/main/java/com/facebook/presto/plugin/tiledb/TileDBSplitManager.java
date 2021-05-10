@@ -13,11 +13,6 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.predicate.Domain;
-import com.facebook.presto.common.predicate.Marker;
-import com.facebook.presto.common.predicate.Range;
-import com.facebook.presto.common.predicate.TupleDomain;
-import com.facebook.presto.common.predicate.ValueSet;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplitSource;
@@ -27,6 +22,11 @@ import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.predicate.Marker;
+import com.facebook.presto.spi.predicate.Range;
+import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.predicate.ValueSet;
 import com.google.common.collect.ImmutableList;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.EncryptionType;
@@ -44,9 +44,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static com.facebook.presto.common.predicate.Utils.nativeValueToBlock;
-import static com.facebook.presto.common.type.RealType.REAL;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static com.facebook.presto.spi.predicate.Utils.nativeValueToBlock;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
 /**

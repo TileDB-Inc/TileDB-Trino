@@ -13,12 +13,6 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.predicate.Domain;
-import com.facebook.presto.common.predicate.Range;
-import com.facebook.presto.common.predicate.TupleDomain;
-import com.facebook.presto.common.predicate.ValueSet;
-import com.facebook.presto.common.type.Type;
-import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.plugin.tiledb.util.Util;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -39,7 +33,13 @@ import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.TableNotFoundException;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorOutputMetadata;
+import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.predicate.Range;
+import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.predicate.ValueSet;
 import com.facebook.presto.spi.statistics.ComputedStatistics;
+import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -75,8 +75,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import static com.facebook.presto.common.type.RealType.REAL;
-import static com.facebook.presto.common.type.Varchars.isVarcharType;
 import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getDimension;
 import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getExtent;
 import static com.facebook.presto.plugin.tiledb.TileDBColumnProperties.getFilterList;
@@ -87,6 +85,8 @@ import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SE
 import static com.facebook.presto.plugin.tiledb.TileDBModule.tileDBTypeFromPrestoType;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
 import static com.facebook.presto.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
+import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.Varchars.isVarcharType;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;

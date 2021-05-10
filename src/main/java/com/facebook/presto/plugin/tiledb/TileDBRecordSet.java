@@ -13,11 +13,11 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.type.Type;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.EncryptionType;

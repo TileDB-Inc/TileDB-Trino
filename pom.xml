@@ -5,14 +5,9 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>com.facebook.presto</groupId>
-        <version>0.250</version>
+        <version>0.232</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-
-    <properties>
-        <dep.airlift.version>0.198</dep.airlift.version>
-        <dep.prestodb.version>0.250</dep.prestodb.version>
-    </properties>
 
     <artifactId>presto-tiledb</artifactId>
     <name>presto-tiledb</name>
@@ -36,25 +31,21 @@
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>bootstrap</artifactId>
-            <version>${dep.airlift.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>configuration</artifactId>
-            <version>0.200</version>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>json</artifactId>
-            <version>${dep.airlift.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>log</artifactId>
-            <version>${dep.airlift.version}</version>
         </dependency>
 
         <dependency>
@@ -117,7 +108,6 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
-            <version>${dep.prestodb.version}</version>
             <scope>provided</scope>
             <!-- https://mvnrepository.com/artifact/commons-beanutils/commons-beanutils -->
             <exclusions>
@@ -147,55 +137,32 @@
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.drift</groupId>
-            <artifactId>drift-api</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.openjdk.jol</groupId>
-            <artifactId>jol-core</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-common</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main</artifactId>
-            <version>${dep.prestodb.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-tests</artifactId>
-            <version>${dep.prestodb.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-tpch</artifactId>
-            <version>${dep.prestodb.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>testing</artifactId>
-            <version>${dep.airlift.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>io.airlift.tpch</groupId>
             <artifactId>tpch</artifactId>
-            <version>0.10</version>
             <scope>test</scope>
         </dependency>
 

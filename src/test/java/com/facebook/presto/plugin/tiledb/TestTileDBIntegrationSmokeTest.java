@@ -23,9 +23,9 @@ import io.tiledb.java.api.TileDBError;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static com.facebook.presto.plugin.tiledb.TileDBQueryRunner.createTileDBQueryRunner;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static io.tiledb.java.api.TileDBObject.remove;
 import static org.assertj.core.api.Assertions.assertThat;

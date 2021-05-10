@@ -13,13 +13,13 @@
  */
 package com.facebook.presto.plugin.tiledb;
 
-import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
+import com.facebook.presto.spi.predicate.TupleDomain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.List;
@@ -76,15 +76,15 @@ public class TileDBSplit
     }
 
     @Override
-    public NodeSelectionStrategy getNodeSelectionStrategy()
+    public boolean isRemotelyAccessible()
     {
-        return NodeSelectionStrategy.SOFT_AFFINITY;
+        return true;
     }
 
     @Override
-    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+    public List<HostAddress> getAddresses()
     {
-        return sortedCandidates;
+        return ImmutableList.of();
     }
 
     @Override
