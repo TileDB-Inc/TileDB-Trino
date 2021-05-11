@@ -5,13 +5,13 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>com.facebook.presto</groupId>
-        <version>0.250</version>
+        <version>0.245.1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <properties>
         <dep.airlift.version>0.198</dep.airlift.version>
-        <dep.prestodb.version>0.250</dep.prestodb.version>
+        <dep.prestodb.version>0.245.1</dep.prestodb.version>
     </properties>
 
     <artifactId>presto-tiledb</artifactId>
