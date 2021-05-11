@@ -80,7 +80,12 @@ public class TileDBRecordSet
                 array = new Array(tileDBClient.buildContext(session), table.getURI().toString(), TILEDB_READ);
             }
             query = new Query(array, TILEDB_READ);
-            query.setLayout(Layout.TILEDB_GLOBAL_ORDER);
+            if (array.getSchema().isSparse()) {
+                query.setLayout(Layout.TILEDB_UNORDERED);
+            }
+            else {
+                query.setLayout(array.getSchema().getTileOrder());
+            }
         }
         catch (TileDBError tileDBError) {
             throw new PrestoException(TILEDB_RECORD_SET_ERROR, tileDBError);
