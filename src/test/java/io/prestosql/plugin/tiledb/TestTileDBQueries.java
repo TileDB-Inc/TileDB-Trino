@@ -1313,11 +1313,72 @@ public class TestTileDBQueries
         assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
         dropArray(arrayName);
     }
+
+    @Test
+    public void testDenseWriteReadNullable()
+    {
+        String arrayName = "test_dense_write_read";
+        dropArray(arrayName);
+        create1DVectorDense(arrayName);
+
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(1, 10), (2, 13), (3, null), (4, 15), (5, 19), (6, 10), (7, 5), (8, 1), (9, 7) ", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
+//        for (MaterializedRow row : resultRows) {
+//            System.out.println(row);
+//        }
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER)
+                .row(1, 10)
+                .row(2, 13)
+                .row(3, null)
+                .row(4, 15)
+                .row(5, 19)
+                .row(6, 10)
+                .row(7, 5)
+                .row(8, 1)
+                .row(9, 7)
+                .build();
+        List<MaterializedRow> expectedRows = expected.getMaterializedRows();
+        List<String> resultRowsToString = resultRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        List<String> expectedRowsToString = expectedRows.stream()
+                .map(object -> Objects.toString(object, null))
+                .collect(Collectors.toList());
+        assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
+
+        dropArray(arrayName);
+    }
+
     /*
     =======================================================
     Nullable attributes end
     ======================================================
      */
+
+    @Test
+    public void test1DNoAttributeWriteRead()
+    {
+        String arrayName = "test_write_read_1d_no_attr";
+        dropArray(arrayName);
+        create1DVectorNoAttribute(arrayName);
+
+        String insertSql = format("INSERT INTO %s (x) VALUES " +
+                "(4)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql = format("SELECT * FROM %s", arrayName);
+        MaterializedResult selectResult = computeActual(selectSql);
+        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
+        for (MaterializedRow row : resultRows) {
+            System.out.println(row);
+        }
+        dropArray(arrayName);
+    }
 
     private void create1DVector(String arrayName)
     {
@@ -1329,6 +1390,25 @@ public class TestTileDBQueries
         queryRunner.execute(createSql);
     }
 
+    private void create1DVectorNoAttribute(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x bigint WITH (dimension=true) " +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1DVectorDense(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x integer WITH (dimension=true, lower_bound=1, upper_bound=9, extent=2), " +
+                "a1 integer  WITH (nullable=true)" +
+                ") WITH (uri='%s', type='DENSE')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
     private void create1DVectorNullableSparse(String arrayName)
     {
         QueryRunner queryRunner = getQueryRunner();
@@ -1337,16 +1417,6 @@ public class TestTileDBQueries
                 "a1 integer WITH (nullable=true), " +
                 "a2 integer WITH (nullable=true)" +
                 ") WITH (uri='%s')", arrayName, arrayName); //SPARSE is the default value
-        queryRunner.execute(createSql);
-    }
-
-    private void create1DVectorNullableDense(String arrayName)
-    {
-        QueryRunner queryRunner = getQueryRunner();
-        String createSql = format("CREATE TABLE %s(" +
-                "x bigint WITH (dimension=true), " +
-                "a1 integer WITH (nullable=true)" +
-                ") WITH (uri='%s', type='%s')", arrayName, arrayName, "DENSE");
         queryRunner.execute(createSql);
     }
 

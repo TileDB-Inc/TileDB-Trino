@@ -14,6 +14,7 @@
 package io.prestosql.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -56,6 +57,7 @@ import static java.util.Objects.requireNonNull;
 public class TileDBSplitManager
         implements ConnectorSplitManager
 {
+    private static final Logger LOG = Logger.get(TileDBSplitManager.class);
     private final String connectorId;
     private final TileDBClient tileDBClient;
     private TileDBTableLayoutHandle layoutHandle;
@@ -274,6 +276,10 @@ public class TileDBSplitManager
 
                 // Only set the range if the values are not equal or if the low
                 // and high are the bounds must also be the same
+                if (low > high) {
+                    LOG.warn("Low > high while setting ranges."); //TODO investigate why
+                    return ranges;
+                }
                 if (low != high || lowBound == upperBound) {
                     ranges.add(new Range(
                             new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), low)), lowBound),

@@ -296,7 +296,7 @@ public class TileDBRecordCursor
         }
 
         try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
-            // If we're empty let's atleast select the first dimension
+            // If we're empty let's at least select the first dimension
             // this is needed for count queries
             if (columnIndexLookup.isEmpty()) {
                 columnIndexLookup.put(domain.getDimension(0).getName(), 0);
@@ -346,7 +346,7 @@ public class TileDBRecordCursor
     private void initQueryBufferForField(String field, Pair<Integer, Integer> maxBufferElements) throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
-        boolean isAttribute = arraySchema.hasAttribute(field);
+        boolean isAttribute = arraySchema.getAttributes().containsKey(field);
         boolean isVar;
         boolean isNullable;
         Datatype type;
@@ -833,7 +833,7 @@ public class TileDBRecordCursor
                     currentNumRecords = 0;
                     for (Map.Entry<String, Pair<Long, Long>> resultElements : queryResultBufferElements.entrySet()) {
                         boolean isVar = false;
-                        if (arraySchema.hasAttribute(resultElements.getKey())) {
+                        if (arraySchema.getAttributes().containsKey(resultElements.getKey())) {
                             try (Attribute attr = arraySchema.getAttribute(resultElements.getKey())) {
                                 isVar = attr.isVar();
                             }

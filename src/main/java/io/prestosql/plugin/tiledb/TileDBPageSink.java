@@ -200,7 +200,7 @@ public class TileDBPageSink
     /**
      * appendPage adds the rows
      * @param page rows/columns to insert
-     * @return Future not currently used, but could be for async writing. It does support nullable attributes for now.
+     * @return Future not currently used, but could be for async writing. It does not support nullable attributes for now.
      */
     @Override
     public CompletableFuture<?> appendPage(Page page)
