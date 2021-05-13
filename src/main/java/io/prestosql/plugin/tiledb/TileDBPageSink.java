@@ -387,8 +387,12 @@ public class TileDBPageSink
         Block block = page.getBlock(channel);
         String colName = columnHandles.get(channel).getColumnName();
         Datatype colType;
+        boolean isDimension = array.getSchema().getDomain().hasDimension(colName);
 
         if (block.isNull(position)) {
+            if (isDimension) {
+                throw new TileDBError("Can not insert NULL to dimension: " + colName);
+            }
             validityMaps[channel][bufferPosition] = 0;
         }
 
@@ -396,7 +400,7 @@ public class TileDBPageSink
             colType = dataTypeCache.get(channel);
         }
         else {
-            if (array.getSchema().getDomain().hasDimension(colName)) {
+            if (isDimension) {
                 colType = array.getSchema().getDomain().getDimension(colName).getType();
             }
             else {
