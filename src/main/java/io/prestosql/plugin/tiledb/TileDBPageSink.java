@@ -26,9 +26,12 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
+import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
+import io.tiledb.java.api.Dimension;
+import io.tiledb.java.api.Domain;
 import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.NativeArray;
@@ -176,7 +179,6 @@ public class TileDBPageSink
         validityMaps = new short[columnHandles.size()][maxBufferSize];
         // Loop through each column
         for (int channel = 0; channel < columnHandles.size(); channel++) {
-            Arrays.fill(validityMaps[channel], (short) 1); //all valid
             // Datatype
             Datatype type = null;
             // Is column of variable length
@@ -192,6 +194,9 @@ public class TileDBPageSink
             values = new NativeArray(ctx, maxBufferSize, type);
             if (isVariableLength) {
                 offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
+            }
+            if (!columnHandle.getIsDimension()) {
+                Arrays.fill(validityMaps[channel], (short) 1); // all valid
             }
             buffers.put(columnName, new Pair<>(offsets, values));
         }
@@ -387,22 +392,32 @@ public class TileDBPageSink
         Block block = page.getBlock(channel);
         String colName = columnHandles.get(channel).getColumnName();
         Datatype colType;
+        boolean isDimension;
+        try (ArraySchema arraySchema = array.getSchema(); Domain domain = arraySchema.getDomain();) {
+            isDimension = domain.hasDimension(colName);
+            if (block.isNull(position)) {
+                if (isDimension) {
+                    throw new TileDBError("Can not insert NULL to dimension: " + colName);
+                }
+                validityMaps[channel][bufferPosition] = 0;
+            }
 
-        if (block.isNull(position)) {
-            validityMaps[channel][bufferPosition] = 0;
-        }
-
-        if (dataTypeCache.containsKey(channel)) {
-            colType = dataTypeCache.get(channel);
-        }
-        else {
-            if (array.getSchema().getDomain().hasDimension(colName)) {
-                colType = array.getSchema().getDomain().getDimension(colName).getType();
+            if (dataTypeCache.containsKey(channel)) {
+                colType = dataTypeCache.get(channel);
             }
             else {
-                colType = array.getSchema().getAttribute(colName).getType();
+                if (isDimension) {
+                    try (Dimension dim = domain.getDimension(colName)) {
+                        colType = dim.getType();
+                    }
+                }
+                else {
+                    try (Attribute att = arraySchema.getAttribute(colName)) {
+                        colType = att.getType();
+                    }
+                }
+                dataTypeCache.put(channel, colType);
             }
-            dataTypeCache.put(channel, colType);
         }
 
         int size = 1;
