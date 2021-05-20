@@ -1,6 +1,6 @@
 # TileDB Presto Connector
 
-[![Build Status](https://dev.azure.com/TileDB-Inc/CI/_apis/build/status/TileDB-Inc.TileDB-Presto?branchName=refs%2Fpull%2F50%2Fmerge)](https://dev.azure.com/TileDB-Inc/CI/_build/latest?definitionId=28&branchName=refs%2Fpull%2F50%2Fmerge)
+[![Build Status](https://dev.azure.com/TileDB-Inc/CI/_apis/build/status/TileDB-Inc.TileDB-Trino?branchName=master)](https://dev.azure.com/TileDB-Inc/CI/_build/latest?definitionId=39&branchName=master)
 
 TileDB is an efficient library for managing large-scale,
 multi-dimensional dense and sparse array data introducing a novel array format. For more information about TileDB
