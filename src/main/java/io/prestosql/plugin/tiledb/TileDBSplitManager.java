@@ -11,29 +11,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
-import io.prestosql.spi.NodeManager;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.ConnectorSplitManager;
-import io.prestosql.spi.connector.ConnectorSplitSource;
-import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
-import io.prestosql.spi.connector.ConnectorTransactionHandle;
-import io.prestosql.spi.connector.FixedSplitSource;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.Marker;
-import io.prestosql.spi.predicate.Range;
-import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.predicate.ValueSet;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.QueryType;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.NodeManager;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnHandle;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorSplitManager;
+import io.trino.spi.connector.ConnectorSplitSource;
+import io.trino.spi.connector.ConnectorTableLayoutHandle;
+import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.connector.FixedSplitSource;
+import io.trino.spi.predicate.Domain;
+import io.trino.spi.predicate.Range;
+import io.trino.spi.predicate.TupleDomain;
+import io.trino.spi.predicate.ValueSet;
 import org.apache.commons.beanutils.ConvertUtils;
 
 import javax.inject.Inject;
@@ -45,10 +44,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
-import static io.prestosql.spi.predicate.Utils.nativeValueToBlock;
-import static io.prestosql.spi.type.RealType.REAL;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.trino.spi.predicate.Range.range;
+import static io.trino.spi.predicate.Utils.nativeValueToBlock;
+import static io.trino.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -104,7 +104,7 @@ public class TileDBSplitManager
             return new FixedSplitSource(splits);
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_SPLIT_MANAGER_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_SPLIT_MANAGER_ERROR, tileDBError);
         }
     }
 
@@ -225,14 +225,14 @@ public class TileDBSplitManager
         // Only long dimensions can be split with naive algorithm
         if (!REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
             long min = (Long) ConvertUtils.convert(nonEmptyDomain.getFirst(), Long.class);
-            if (range.getLow().getValueBlock().isPresent()) {
-                min = (Long) range.getLow().getValue();
+            if (range.getLowValue().isPresent()) {
+                min = (Long) range.getLowBoundedValue();
                 minFromNonEmptyDomain = false;
             }
 
             long max = (Long) ConvertUtils.convert(nonEmptyDomain.getSecond(), Long.class);
-            if (range.getHigh().getValueBlock().isPresent()) {
-                max = (Long) range.getHigh().getValue();
+            if (range.getHighValue().isPresent()) {
+                max = (Long) range.getHighBoundedValue();
                 maxFromNonEmptyDomain = false;
             }
 
@@ -248,22 +248,22 @@ public class TileDBSplitManager
 
             long low = min;
             for (int i = 0; i < buckets; i++) {
-                Marker.Bound lowBound = Marker.Bound.EXACTLY;
-                Marker.Bound upperBound = Marker.Bound.EXACTLY;
                 // We want to set the high of the split range to be the low value of the range + the length - 1
                 long high = low + rangeLength - 1;
-                // Handle base case where range length is 1, so we don't need to substract one to account for inclusiveness
 
+                // Handle base case where range length is 1, so we don't need to substract one to account for inclusiveness
+                boolean lowerInclusive = true;
+                boolean highInclusive = true;
                 // If this is the first split we need to set the bound to the same as the range lower bound
                 if (i == 0 && !minFromNonEmptyDomain) {
-                    lowBound = range.getLow().getBound();
+                    lowerInclusive = range.isLowInclusive();
                 }
 
                 // If this is the last split we need to set the bond to the same as the range upper bound
                 // Also make sure we don't leave any values out by setting the high to the max of the range
                 if (i == buckets - 1) {
                     if (!maxFromNonEmptyDomain) {
-                        upperBound = range.getHigh().getBound();
+                        highInclusive = range.isHighInclusive();
                     }
                     high = max;
                 }
@@ -280,10 +280,13 @@ public class TileDBSplitManager
                     LOG.warn("Low > high while setting ranges."); //TODO investigate why
                     return ranges;
                 }
-                if (low != high || lowBound == upperBound) {
-                    ranges.add(new Range(
-                            new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), low)), lowBound),
-                            new Marker(range.getType(), Optional.of(nativeValueToBlock(range.getType(), high)), upperBound)));
+                if (low != high || range.isSingleValue()) {
+                    ranges.add(range(
+                            range.getType(),
+                            Optional.of(nativeValueToBlock(range.getType(), low)),
+                            lowerInclusive,
+                            Optional.of(nativeValueToBlock(range.getType(), high)),
+                            highInclusive));
                 }
                 // Set the low value to the high+1 for the next range split
                 low = high + 1;

@@ -11,19 +11,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.tpch.TpchTable;
-import io.prestosql.Session;
-import io.prestosql.metadata.QualifiedObjectName;
-import io.prestosql.plugin.tpch.TpchPlugin;
-import io.prestosql.testing.DistributedQueryRunner;
-import io.prestosql.testing.QueryRunner;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.TileDBError;
+import io.trino.Session;
+import io.trino.metadata.QualifiedObjectName;
+import io.trino.plugin.tpch.TpchPlugin;
+import io.trino.testing.DistributedQueryRunner;
+import io.trino.testing.QueryRunner;
 import org.intellij.lang.annotations.Language;
 
 import java.io.File;
@@ -33,9 +33,9 @@ import java.util.Map;
 
 import static io.airlift.testing.Closeables.closeAllSuppress;
 import static io.airlift.units.Duration.nanosSince;
-import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
-import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.tiledb.java.api.Array.exists;
+import static io.trino.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
+import static io.trino.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.SECONDS;
 

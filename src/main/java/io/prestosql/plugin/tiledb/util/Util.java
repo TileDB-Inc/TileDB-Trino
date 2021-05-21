@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb.util;
+package io.trino.plugin.tiledb.util;
 
 import io.tiledb.java.api.BitShuffleFilter;
 import io.tiledb.java.api.BitWidthReductionFilter;

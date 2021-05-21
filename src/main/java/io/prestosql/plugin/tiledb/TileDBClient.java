@@ -11,16 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ConnectorSession;
 import io.tiledb.java.api.Config;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ConnectorSession;
 import oshi.hardware.HardwareAbstractionLayer;
 
 import javax.inject.Inject;
@@ -32,13 +32,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CONFIG_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CONTEXT_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_DROP_TABLE_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getAwsAccessKeyId;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getAwsSecretAccessKey;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getTileDBConfig;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CONFIG_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CONTEXT_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_DROP_TABLE_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getAwsAccessKeyId;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getAwsSecretAccessKey;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getTileDBConfig;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -86,7 +86,7 @@ public class TileDBClient
         }
         catch (TileDBError tileDBError) {
             // Print stacktrace, this produces an error client side saying "internal error"
-            throw new PrestoException(TILEDB_CONTEXT_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_CONTEXT_ERROR, tileDBError);
         }
 
         // connectorId is an internal prestodb identified
@@ -153,7 +153,7 @@ public class TileDBClient
         }
         catch (TileDBError tileDBError) {
             if ((new File(arrayUri.toString())).exists()) {
-                throw new PrestoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
+                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
             }
         }
         return tileDBTable;
@@ -204,10 +204,10 @@ public class TileDBClient
                 return addTableFromURI(localCtx, schema, new URI(tableName), encryptionType, encryptionKey);
             }
             catch (URISyntaxException e) {
-                throw new PrestoException(TILEDB_UNEXPECTED_ERROR, e);
+                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, e);
             }
             catch (TileDBError tileDBError) {
-                throw new PrestoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
+                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
             }
         }
         return tables.get(tableName);
@@ -251,7 +251,7 @@ public class TileDBClient
             schemas.get(handle.getSchemaName()).remove(handle.getTableName());
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_DROP_TABLE_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_DROP_TABLE_ERROR, tileDBError);
         }
     }
 
@@ -263,7 +263,7 @@ public class TileDBClient
             schemas.get(handle.getSchemaName()).remove(handle.getTableName());
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_DROP_TABLE_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_DROP_TABLE_ERROR, tileDBError);
         }
     }
 
@@ -280,7 +280,7 @@ public class TileDBClient
                 for (String config : configString.split(",")) {
                     String[] kv = config.split("=");
                     if (kv.length != 2) {
-                        throw new PrestoException(TILEDB_CONFIG_ERROR, "invalid config for " + config);
+                        throw new TrinoException(TILEDB_CONFIG_ERROR, "invalid config for " + config);
                     }
                     tileDBConfig.set(kv[0], kv[1]);
                     updateCtx = true;

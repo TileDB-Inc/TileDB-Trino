@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -19,33 +19,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import io.airlift.slice.Slice;
-import io.prestosql.plugin.tiledb.util.Util;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.ColumnMetadata;
-import io.prestosql.spi.connector.ConnectorInsertTableHandle;
-import io.prestosql.spi.connector.ConnectorMetadata;
-import io.prestosql.spi.connector.ConnectorNewTableLayout;
-import io.prestosql.spi.connector.ConnectorOutputMetadata;
-import io.prestosql.spi.connector.ConnectorOutputTableHandle;
-import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.ConnectorTableHandle;
-import io.prestosql.spi.connector.ConnectorTableLayout;
-import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
-import io.prestosql.spi.connector.ConnectorTableLayoutResult;
-import io.prestosql.spi.connector.ConnectorTableMetadata;
-import io.prestosql.spi.connector.Constraint;
-import io.prestosql.spi.connector.LocalProperty;
-import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.connector.SchemaTablePrefix;
-import io.prestosql.spi.connector.TableNotFoundException;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.Range;
-import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.predicate.ValueSet;
-import io.prestosql.spi.statistics.ComputedStatistics;
-import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.VarcharType;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.ArrayType;
@@ -56,6 +29,33 @@ import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.TileDBError;
+import io.trino.plugin.tiledb.util.Util;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnHandle;
+import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorInsertTableHandle;
+import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorNewTableLayout;
+import io.trino.spi.connector.ConnectorOutputMetadata;
+import io.trino.spi.connector.ConnectorOutputTableHandle;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableHandle;
+import io.trino.spi.connector.ConnectorTableLayout;
+import io.trino.spi.connector.ConnectorTableLayoutHandle;
+import io.trino.spi.connector.ConnectorTableLayoutResult;
+import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.Constraint;
+import io.trino.spi.connector.LocalProperty;
+import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.connector.SchemaTablePrefix;
+import io.trino.spi.connector.TableNotFoundException;
+import io.trino.spi.predicate.Domain;
+import io.trino.spi.predicate.Range;
+import io.trino.spi.predicate.TupleDomain;
+import io.trino.spi.predicate.ValueSet;
+import io.trino.spi.statistics.ComputedStatistics;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.VarcharType;
 import org.apache.commons.beanutils.ConvertUtils;
 
 import javax.inject.Inject;
@@ -78,24 +78,23 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
-import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getDimension;
-import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getExtent;
-import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getFilterList;
-import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getLowerBound;
-import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getNullable;
-import static io.prestosql.plugin.tiledb.TileDBColumnProperties.getUpperBound;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBModule.tileDBTypeFromPrestoType;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
-import static io.prestosql.plugin.tiledb.TileDBTableProperties.getEncryptionKey;
-import static io.prestosql.spi.type.RealType.REAL;
-import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
 import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
 import static io.tiledb.java.api.Constants.TILEDB_VAR_NUM;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
+import static io.trino.plugin.tiledb.TileDBColumnProperties.getDimension;
+import static io.trino.plugin.tiledb.TileDBColumnProperties.getExtent;
+import static io.trino.plugin.tiledb.TileDBColumnProperties.getFilterList;
+import static io.trino.plugin.tiledb.TileDBColumnProperties.getLowerBound;
+import static io.trino.plugin.tiledb.TileDBColumnProperties.getNullable;
+import static io.trino.plugin.tiledb.TileDBColumnProperties.getUpperBound;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
+import static io.trino.plugin.tiledb.TileDBModule.tileDBTypeFromTrinoType;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
+import static io.trino.plugin.tiledb.TileDBTableProperties.getEncryptionKey;
+import static io.trino.spi.type.RealType.REAL;
 import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
@@ -213,7 +212,7 @@ public class TileDBMetadata
                                 range = Range.range(type, ((Integer) floatToRawIntBits((Float) nonEmptyMin)).longValue(), true,
                                         ((Integer) floatToRawIntBits((Float) nonEmptyMax)).longValue(), true);
                             }
-                            else if (isVarcharType(type)) {
+                            else if (type instanceof VarcharType) {
                                 range = Range.range(type, utf8Slice(nonEmptyMin.toString()), true,
                                         utf8Slice(nonEmptyMax.toString()), true);
                             }
@@ -232,7 +231,7 @@ public class TileDBMetadata
                 array.close();
             }
             catch (TileDBError tileDBError) {
-                throw new PrestoException(TILEDB_RECORD_SET_ERROR, tileDBError);
+                throw new TrinoException(TILEDB_RECORD_SET_ERROR, tileDBError);
             }
         }
 
@@ -549,7 +548,7 @@ public class TileDBMetadata
                 Map<String, Object> columnProperties = column.getProperties();
 
                 // Get column type, convert to type types
-                Datatype type = tileDBTypeFromPrestoType(column.getType());
+                Datatype type = tileDBTypeFromTrinoType(column.getType());
 
                 // Get filter list
                 String filters = getFilterList(columnProperties);
@@ -576,7 +575,7 @@ public class TileDBMetadata
                 }
                 else {
                     Attribute attribute = new Attribute(localCtx, columnName, type);
-                    if (isVarcharType(column.getType())) {
+                    if (column.getType() instanceof VarcharType) {
                         VarcharType varcharType = (VarcharType) column.getType();
                         Optional<Integer> len = varcharType.getLength();
                         if (varcharType.isUnbounded() || (len.isPresent() && len.get() > 1)) {
@@ -661,10 +660,10 @@ public class TileDBMetadata
                     uri);
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_CREATE_TABLE_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_CREATE_TABLE_ERROR, tileDBError);
         }
         catch (URISyntaxException e) {
-            throw new PrestoException(TILEDB_CREATE_TABLE_ERROR, e);
+            throw new TrinoException(TILEDB_CREATE_TABLE_ERROR, e);
         }
     }
 

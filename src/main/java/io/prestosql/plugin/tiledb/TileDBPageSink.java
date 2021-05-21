@@ -11,20 +11,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.prestosql.spi.Page;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.block.Block;
-import io.prestosql.spi.connector.ConnectorPageSink;
-import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.type.DecimalType;
-import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
@@ -40,6 +33,15 @@ import io.tiledb.java.api.Query;
 import io.tiledb.java.api.QueryStatus;
 import io.tiledb.java.api.QueryType;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.Page;
+import io.trino.spi.TrinoException;
+import io.trino.spi.block.Block;
+import io.trino.spi.connector.ConnectorPageSink;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.type.CharType;
+import io.trino.spi.type.DecimalType;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.VarcharType;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
@@ -56,22 +58,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_PAGE_SINK_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.Chars.isCharType;
-import static io.prestosql.spi.type.DateType.DATE;
-import static io.prestosql.spi.type.Decimals.readBigDecimal;
-import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.spi.type.IntegerType.INTEGER;
-import static io.prestosql.spi.type.RealType.REAL;
-import static io.prestosql.spi.type.SmallintType.SMALLINT;
-import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
-import static io.prestosql.spi.type.TinyintType.TINYINT;
-import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
-import static io.prestosql.spi.type.Varchars.isVarcharType;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_PAGE_SINK_ERROR;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getWriteBufferSize;
+import static io.trino.spi.type.BigintType.BIGINT;
+import static io.trino.spi.type.BooleanType.BOOLEAN;
+import static io.trino.spi.type.DateType.DATE;
+import static io.trino.spi.type.Decimals.readBigDecimal;
+import static io.trino.spi.type.DoubleType.DOUBLE;
+import static io.trino.spi.type.IntegerType.INTEGER;
+import static io.trino.spi.type.RealType.REAL;
+import static io.trino.spi.type.SmallintType.SMALLINT;
+import static io.trino.spi.type.TimestampType.TIMESTAMP;
+import static io.trino.spi.type.TinyintType.TINYINT;
+import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -131,7 +131,7 @@ public class TileDBPageSink
             this.table = handle;
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
         }
 
         columnHandles = handle.getColumnHandles();
@@ -247,7 +247,7 @@ public class TileDBPageSink
                     bufferEffectiveSizes = previousBufferEffectiveSizes;
                     // submitQuery
                     if (submitQuery(buffers, bufferEffectiveSizes) == QueryStatus.TILEDB_FAILED) {
-                        throw new PrestoException(TILEDB_PAGE_SINK_ERROR, e);
+                        throw new TrinoException(TILEDB_PAGE_SINK_ERROR, e);
                     }
                     resetQuery(buffers);
                     bufferEffectiveSizes.clear();
@@ -269,7 +269,7 @@ public class TileDBPageSink
             }
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
         }
 
         return NOT_BLOCKED;
@@ -424,7 +424,7 @@ public class TileDBPageSink
         Type type = columnHandles.get(channel).getColumnType();
 
         // Only varchar and varbinary are supported for variable length attributes, so we only check these for additional size requirements
-        if (isVarcharType(type) || isCharType(type)) {
+        if (type instanceof VarcharType || type instanceof CharType) {
             size = type.getSlice(block, position).toStringUtf8().length();
         }
         else if (VARBINARY.equals(type)) {
@@ -460,7 +460,7 @@ public class TileDBPageSink
         else if (type instanceof DecimalType) {
             columnBuffer.setItem(bufferPosition, readBigDecimal((DecimalType) type, block, position).doubleValue());
         }
-        else if (isVarcharType(type) || isCharType(type)) {
+        else if (type instanceof VarcharType || type instanceof CharType) {
             columnBuffer.setItem(bufferPosition, type.getSlice(block, position).toStringUtf8());
         }
         else if (VARBINARY.equals(type)) {
@@ -532,7 +532,7 @@ public class TileDBPageSink
             columnBuffer.setItem(bufferPosition, type.getLong(block, position));
         }
         else {
-            throw new PrestoException(TILEDB_PAGE_SINK_ERROR, "Unsupported column type: " + type.getDisplayName());
+            throw new TrinoException(TILEDB_PAGE_SINK_ERROR, "Unsupported column type: " + type.getDisplayName());
         }
 
         return bufferPosition + size;
@@ -548,7 +548,7 @@ public class TileDBPageSink
             array.close();
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_PAGE_SINK_ERROR, tileDBError);
         }
         // the committer does not need any additional info
         return completedFuture(ImmutableList.of());

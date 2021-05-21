@@ -1,1 +1,1 @@
-io.prestosql.plugin.tiledb.TileDBPlugin
+io.trino.plugin.tiledb.TileDBPlugin

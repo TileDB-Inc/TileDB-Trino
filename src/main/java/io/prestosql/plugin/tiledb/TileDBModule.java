@@ -11,20 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
-import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.spi.type.VarbinaryType;
-import io.prestosql.spi.type.VarcharType;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.type.CharType;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.TypeManager;
+import io.trino.spi.type.TypeSignature;
+import io.trino.spi.type.VarbinaryType;
+import io.trino.spi.type.VarcharType;
 
 import javax.inject.Inject;
 
@@ -35,18 +36,16 @@ import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.json.JsonBinder.jsonBinder;
 import static io.airlift.json.JsonCodec.listJsonCodec;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.Chars.isCharType;
-import static io.prestosql.spi.type.DateType.DATE;
-import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.spi.type.IntegerType.INTEGER;
-import static io.prestosql.spi.type.RealType.REAL;
-import static io.prestosql.spi.type.SmallintType.SMALLINT;
-import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
-import static io.prestosql.spi.type.TinyintType.TINYINT;
-import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.Datatype.TILEDB_DATETIME_DAY;
+import static io.trino.spi.type.BigintType.BIGINT;
+import static io.trino.spi.type.DateType.DATE;
+import static io.trino.spi.type.DoubleType.DOUBLE;
+import static io.trino.spi.type.IntegerType.INTEGER;
+import static io.trino.spi.type.RealType.REAL;
+import static io.trino.spi.type.SmallintType.SMALLINT;
+import static io.trino.spi.type.TimestampType.TIMESTAMP;
+import static io.trino.spi.type.TinyintType.TINYINT;
+import static io.trino.spi.type.VarcharType.VARCHAR;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -150,7 +149,7 @@ public class TileDBModule
         }
     }
 
-    public static Datatype tileDBTypeFromPrestoType(Type type) throws TileDBError
+    public static Datatype tileDBTypeFromTrinoType(Type type) throws TileDBError
     {
         type.getJavaType();
         if (type.equals(TINYINT)) {
@@ -165,10 +164,10 @@ public class TileDBModule
         else if (type.equals(BIGINT)) {
             return Datatype.TILEDB_INT64;
         }
-        else if (isCharType(type)) {
+        else if (type instanceof CharType) {
             return Datatype.TILEDB_CHAR;
         }
-        else if (isVarcharType(type)) {
+        else if (type instanceof VarcharType) {
             VarcharType varcharType = ((VarcharType) type);
             // Return TILEDB_CHAR in case the datatype is varchar(1)
             if (varcharType.getLength().isPresent() && varcharType.getLength().get().equals(1)) {

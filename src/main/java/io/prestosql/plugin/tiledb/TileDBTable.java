@@ -11,14 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.connector.ColumnMetadata;
-import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.VarcharType;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
@@ -27,13 +24,16 @@ import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.Domain;
 import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.VarcharType;
 
 import java.net.URI;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static io.prestosql.plugin.tiledb.TileDBModule.prestoTypeFromTileDBType;
+import static io.trino.plugin.tiledb.TileDBModule.prestoTypeFromTileDBType;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 

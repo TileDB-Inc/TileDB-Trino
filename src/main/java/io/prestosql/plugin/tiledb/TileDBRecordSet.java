@@ -11,27 +11,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.RecordCursor;
-import io.prestosql.spi.connector.RecordSet;
-import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Layout;
 import io.tiledb.java.api.Query;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.RecordCursor;
+import io.trino.spi.connector.RecordSet;
+import io.trino.spi.type.Type;
 
 import java.math.BigInteger;
 import java.util.List;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getTimestamp;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getTimestamp;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -88,7 +88,7 @@ public class TileDBRecordSet
             }
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_RECORD_SET_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_RECORD_SET_ERROR, tileDBError);
         }
     }
 
