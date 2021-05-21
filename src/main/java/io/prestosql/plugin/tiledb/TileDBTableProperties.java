@@ -11,19 +11,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.session.PropertyMetadata;
-import io.prestosql.spi.type.TypeManager;
+import io.trino.spi.session.PropertyMetadata;
+import io.trino.spi.type.TypeManager;
 
 import javax.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
 
-import static io.prestosql.spi.session.PropertyMetadata.longProperty;
-import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
+import static io.trino.spi.session.PropertyMetadata.longProperty;
+import static io.trino.spi.session.PropertyMetadata.stringProperty;
 
 public class TileDBTableProperties
 {

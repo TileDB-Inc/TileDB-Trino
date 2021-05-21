@@ -11,20 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
-import io.prestosql.spi.PrestoException;
+import io.trino.spi.TrinoException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Set;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CONFIG_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CONFIG_ERROR;
 
 /**
  * TileDBConfig maps directly to a configuration file
@@ -89,7 +89,7 @@ public class TileDBConfig
         }
         catch (URISyntaxException e) {
             e.printStackTrace();
-            throw new PrestoException(TILEDB_CONFIG_ERROR, e);
+            throw new TrinoException(TILEDB_CONFIG_ERROR, e);
         }
         this.arrayURIs = builder.build();
         return this;

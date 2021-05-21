@@ -1,11 +1,11 @@
 # SQL
 
-This document contains all custom SQL options defined by the TileDB Presto connector.
+This document contains all custom SQL options defined by the TileDB Trino connector.
 
 ## Create Table
 
 The following properties can be configured for creating a TileDB array in
-Presto.
+Trino.
 
 ### Table properties
 

@@ -11,22 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import io.airlift.tpch.TpchTable;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.testing.AbstractTestIntegrationSmokeTest;
-import io.prestosql.testing.MaterializedResult;
-import io.prestosql.testing.QueryRunner;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.TrinoException;
+import io.trino.testing.AbstractTestIntegrationSmokeTest;
+import io.trino.testing.MaterializedResult;
+import io.trino.testing.QueryRunner;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
-import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static io.tiledb.java.api.TileDBObject.remove;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
+import static io.trino.spi.type.VarcharType.VARCHAR;
+import static io.trino.testing.assertions.Assert.assertEquals;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Test
@@ -42,7 +42,7 @@ public class TestTileDBIntegrationSmokeTest
             ctx = new Context();
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
         }
     }
 
@@ -91,7 +91,7 @@ public class TestTileDBIntegrationSmokeTest
                 remove(ctx, table.getTableName());
             }
             catch (TileDBError tileDBError) {
-                throw new PrestoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
+                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
             }
         }
     }

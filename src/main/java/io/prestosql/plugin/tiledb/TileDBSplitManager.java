@@ -11,29 +11,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
-import io.prestosql.spi.NodeManager;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.ConnectorSplitManager;
-import io.prestosql.spi.connector.ConnectorSplitSource;
-import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
-import io.prestosql.spi.connector.ConnectorTransactionHandle;
-import io.prestosql.spi.connector.FixedSplitSource;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.Marker;
-import io.prestosql.spi.predicate.Range;
-import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.predicate.ValueSet;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.QueryType;
 import io.tiledb.java.api.TileDBError;
+import io.trino.spi.NodeManager;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnHandle;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorSplitManager;
+import io.trino.spi.connector.ConnectorSplitSource;
+import io.trino.spi.connector.ConnectorTableLayoutHandle;
+import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.connector.FixedSplitSource;
+import io.trino.spi.predicate.Domain;
+import io.trino.spi.predicate.Marker;
+import io.trino.spi.predicate.Range;
+import io.trino.spi.predicate.TupleDomain;
+import io.trino.spi.predicate.ValueSet;
 import org.apache.commons.beanutils.ConvertUtils;
 
 import javax.inject.Inject;
@@ -45,10 +45,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
-import static io.prestosql.spi.predicate.Utils.nativeValueToBlock;
-import static io.prestosql.spi.type.RealType.REAL;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.trino.spi.predicate.Utils.nativeValueToBlock;
+import static io.trino.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -104,7 +104,7 @@ public class TileDBSplitManager
             return new FixedSplitSource(splits);
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_SPLIT_MANAGER_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_SPLIT_MANAGER_ERROR, tileDBError);
         }
     }
 

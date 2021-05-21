@@ -11,13 +11,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
-import io.prestosql.spi.ErrorCode;
-import io.prestosql.spi.ErrorCodeSupplier;
-import io.prestosql.spi.ErrorType;
+import io.trino.spi.ErrorCode;
+import io.trino.spi.ErrorCodeSupplier;
+import io.trino.spi.ErrorType;
 
-import static io.prestosql.spi.ErrorType.EXTERNAL;
+import static io.trino.spi.ErrorType.EXTERNAL;
 
 public enum TileDBErrorCode
         implements ErrorCodeSupplier

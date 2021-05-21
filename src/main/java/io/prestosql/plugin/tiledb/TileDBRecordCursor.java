@@ -11,21 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
-import io.prestosql.plugin.tiledb.util.Util;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.RecordCursor;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.Marker;
-import io.prestosql.spi.predicate.Range;
-import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.type.Type;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
@@ -37,6 +27,15 @@ import io.tiledb.java.api.Query;
 import io.tiledb.java.api.QueryStatus;
 import io.tiledb.java.api.Stats;
 import io.tiledb.java.api.TileDBError;
+import io.trino.plugin.tiledb.util.Util;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnHandle;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.RecordCursor;
+import io.trino.spi.predicate.Domain;
+import io.trino.spi.predicate.Range;
+import io.trino.spi.predicate.TupleDomain;
+import io.trino.spi.type.Type;
 import org.apache.commons.beanutils.ConvertUtils;
 
 import java.io.File;
@@ -55,18 +54,17 @@ import java.util.OptionalDouble;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_CURSOR_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getEnableStats;
-import static io.prestosql.plugin.tiledb.TileDBSessionProperties.getReadBufferSize;
-import static io.prestosql.spi.type.RealType.REAL;
-import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.tiledb.java.api.Datatype.TILEDB_UINT64;
 import static io.tiledb.java.api.Datatype.TILEDB_UINT8;
 import static io.tiledb.java.api.QueryStatus.TILEDB_COMPLETED;
 import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
 import static io.tiledb.java.api.QueryStatus.TILEDB_UNINITIALIZED;
 import static io.tiledb.java.api.Types.getJavaType;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_CURSOR_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getEnableStats;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getReadBufferSize;
+import static io.trino.spi.type.RealType.REAL;
 import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.max;
@@ -111,7 +109,7 @@ public class TileDBRecordCursor
     private QueryStatus queryStatus;
 
     /**
-     * Map of attribute name -> Presto column (field) index.
+     * Map of attribute name -> Trino column (field) index.
      */
     private final Map<String, Integer> columnIndexLookup;
 
@@ -248,7 +246,7 @@ public class TileDBRecordCursor
             initializeQuery(split);
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_RECORD_CURSOR_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_RECORD_CURSOR_ERROR, tileDBError);
         }
     }
 
@@ -497,7 +495,7 @@ public class TileDBRecordCursor
         Object dimLowerBound = null;
         Object dimUpperBound = null;
         for (Range range : orderedRanges) {
-            Pair bounds = getBoundsForPrestoRange(range, dimension.getType());
+            Pair bounds = getBoundsForTrinoRange(range, dimension.getType());
             Object rangeLow = bounds.getFirst() == null ? null : ConvertUtils.convert(bounds.getFirst(), dimType);
             Object rangeHigh = bounds.getSecond() == null ? null : ConvertUtils.convert(bounds.getSecond(), dimType);
 
@@ -527,10 +525,10 @@ public class TileDBRecordCursor
     }
 
     /**
-     * Gets a lower, upper bound pair from the given individual Presto range. If a value cannot be determined for either
+     * Gets a lower, upper bound pair from the given individual Trino range. If a value cannot be determined for either
      * end of the interval, null is set for that end in the result.
      */
-    private Pair getBoundsForPrestoRange(Range range, Datatype type) throws TileDBError
+    private Pair getBoundsForTrinoRange(Range range, Datatype type) throws TileDBError
     {
         Object dimLowerBound = null;
         Object dimUpperBound = null;
@@ -552,10 +550,8 @@ public class TileDBRecordCursor
             }
         }
         else {
-            Marker lowerBound = range.getLow();
-
-            if (!lowerBound.isLowerUnbounded()) {
-                Object lowerBoundValue = lowerBound.getValue();
+            if (!range.isLowUnbounded()) {
+                Object lowerBoundValue = range.getLowBoundedValue();
 
                 if (REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
                     lowerBoundValue = intBitsToFloat(toIntExact((Long) lowerBoundValue));
@@ -566,47 +562,31 @@ public class TileDBRecordCursor
                 else {
                     lowerBoundValue = ConvertUtils.convert(lowerBoundValue, getJavaType(type));
                 }
-
-                switch (lowerBound.getBound()) {
-                    case ABOVE:
-                        dimLowerBound = Util.addEpsilon(lowerBoundValue, type);
-                        break;
-                    case EXACTLY:
-                        dimLowerBound = lowerBoundValue;
-                        break;
-                    case BELOW:
-                        throw new IllegalArgumentException("Low marker should never use BELOW bound");
-                    default:
-                        throw new AssertionError("Unhandled bound: " + lowerBound.getBound());
+                if (!range.isLowInclusive()) {
+                    dimLowerBound = Util.addEpsilon(lowerBoundValue, type);
+                }
+                else {
+                    dimLowerBound = lowerBoundValue;
                 }
             }
 
-            Marker upperBound = range.getHigh();
-
             if (!upperBound.isUpperUnbounded()) {
-                Object upperBoundValue = upperBound.getValue();
+                Object upperBoundValue = range.getHighBoundedValue();
 
                 if (REAL.equals(upperBound.getType()) && upperBound.getType().getJavaType() == long.class) {
                     upperBoundValue = intBitsToFloat(toIntExact((Long) upperBoundValue));
                 }
                 else if (isVarcharType(range.getType())) {
-                    upperBoundValue = new String(((Slice) range.getHigh().getValue()).getBytes());
+                    upperBoundValue = new String(((Slice) upperBoundValue).getBytes());
                 }
                 else {
                     upperBoundValue = ConvertUtils.convert(upperBoundValue, getJavaType(type));
                 }
-
-                switch (upperBound.getBound()) {
-                    case ABOVE:
-                        throw new IllegalArgumentException("High marker should never use ABOVE bound");
-                    case EXACTLY:
-                        dimUpperBound = upperBoundValue;
-                        break;
-                    case BELOW:
-                        dimUpperBound = Util.subtractEpsilon(upperBoundValue, type);
-                        break;
-                    default:
-                        throw new AssertionError("Unhandled bound: " + upperBound.getBound());
+                if (!range.isHighInclusive()) {
+                    dimUpperBound = Util.subtractEpsilon(upperBoundValue, type);
+                }
+                else {
+                    dimUpperBound = upperBoundValue;
                 }
             }
         }
@@ -869,7 +849,7 @@ public class TileDBRecordCursor
             }
         }
         catch (TileDBError tileDBError) {
-            throw new PrestoException(TILEDB_RECORD_SET_ERROR, tileDBError);
+            throw new TrinoException(TILEDB_RECORD_SET_ERROR, tileDBError);
         }
 
         cursorPosition++;
@@ -1076,7 +1056,7 @@ public class TileDBRecordCursor
                 value = ((long[]) fieldArray)[index];
                 break;
             }
-            // Presto converts 32bit floats to long types
+            // Trino converts 32bit floats to long types
             case TILEDB_FLOAT32: {
                 value = ((Integer) floatToRawIntBits(((float[]) fieldArray)[index])).longValue();
                 break;

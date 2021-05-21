@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.tiledb.util;
+package io.trino.plugin.tiledb.util;
 
 import io.tiledb.java.api.Pair;
 

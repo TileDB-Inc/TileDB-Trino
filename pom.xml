@@ -10,7 +10,7 @@
     </parent>
 
     <artifactId>trino-tiledb</artifactId>
-    <description>Presto - TileDB Connector</description>
+    <description>Trino - TileDB Connector</description>
 
     <repositories>
         <repository>
@@ -102,7 +102,7 @@
             <artifactId>joda-time</artifactId>
         </dependency>
 
-        <!-- Presto SPI -->
+        <!-- Trino SPI -->
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-spi</artifactId>

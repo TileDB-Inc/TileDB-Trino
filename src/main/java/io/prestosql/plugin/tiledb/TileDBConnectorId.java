@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import java.util.Objects;
 
@@ -19,7 +19,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * TileDBConnectorId wraps around unique string identifiers for each TileDB "connection"
- * The unique identifiers are passed in from PrestoDB
+ * The unique identifiers are passed in from TrinoDB
  */
 public final class TileDBConnectorId
 {

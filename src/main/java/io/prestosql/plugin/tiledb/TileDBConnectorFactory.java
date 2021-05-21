@@ -11,23 +11,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.tiledb;
+package io.trino.plugin.tiledb;
 
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.json.JsonModule;
-import io.prestosql.spi.NodeManager;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.Connector;
-import io.prestosql.spi.connector.ConnectorContext;
-import io.prestosql.spi.connector.ConnectorFactory;
-import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.trino.spi.NodeManager;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.Connector;
+import io.trino.spi.connector.ConnectorContext;
+import io.trino.spi.connector.ConnectorFactory;
+import io.trino.spi.connector.ConnectorHandleResolver;
 
 import java.util.Map;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
-import static io.prestosql.plugin.tiledb.TileDBErrorCode.TILEDB_CONNECTOR_ERROR;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CONNECTOR_ERROR;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -89,7 +89,7 @@ public class TileDBConnectorFactory
         }
         catch (Exception e) {
             throwIfUnchecked(e);
-            throw new PrestoException(TILEDB_CONNECTOR_ERROR, e);
+            throw new TrinoException(TILEDB_CONNECTOR_ERROR, e);
         }
     }
 }
