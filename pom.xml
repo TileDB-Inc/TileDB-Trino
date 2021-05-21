@@ -145,7 +145,7 @@
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-testing</artifactId>
-            <version>340</version>
+            <version>356</version>
             <scope>test</scope>
         </dependency>
 
