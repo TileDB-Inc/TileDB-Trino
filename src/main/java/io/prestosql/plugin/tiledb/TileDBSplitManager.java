@@ -286,12 +286,14 @@ public class TileDBSplitManager
                     lowerInclusive = true;
                     highInclusive = true;
                 }
-                ranges.add(range(
-                        range.getType(),
-                        low,
-                        lowerInclusive,
-                        high,
-                        highInclusive));
+                if (low != high || highInclusive == lowerInclusive) {
+                    ranges.add(range(
+                            range.getType(),
+                            low,
+                            lowerInclusive,
+                            high,
+                            highInclusive));
+                }
                 // Set the low value to the high+1 for the next range split
                 low = high + 1;
             }
