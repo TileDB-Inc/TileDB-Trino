@@ -221,15 +221,19 @@ public class TileDBSplitManager
         boolean maxFromNonEmptyDomain = true;
         // Number of buckets is 1 more thank number of splits (i.e. split 1 time into two buckets)
         // Only long dimensions can be split with naive algorithm
-        if (!REAL.equals(range.getType()) && nonEmptyDomain.getFirst() != null && range.getType().getJavaType() == long.class) {
+        if (
+                !REAL.equals(range.getType()) &&
+                nonEmptyDomain != null &&
+                nonEmptyDomain.getFirst() != null &&
+                range.getType().getJavaType() == long.class) {
             long min = (Long) ConvertUtils.convert(nonEmptyDomain.getFirst(), Long.class);
-            if (range.getLowValue().isPresent()) {
+            if (!range.isLowUnbounded()) {
                 min = (Long) range.getLowBoundedValue();
                 minFromNonEmptyDomain = false;
             }
 
             long max = (Long) ConvertUtils.convert(nonEmptyDomain.getSecond(), Long.class);
-            if (range.getHighValue().isPresent()) {
+            if (!range.isHighUnbounded()) {
                 max = (Long) range.getHighBoundedValue();
                 maxFromNonEmptyDomain = false;
             }
@@ -278,14 +282,16 @@ public class TileDBSplitManager
                     LOG.warn("Low > high while setting ranges."); //TODO investigate why
                     return ranges;
                 }
-                if (low != high || range.isSingleValue()) {
-                    ranges.add(range(
-                            range.getType(),
-                            low,
-                            lowerInclusive,
-                            high,
-                            highInclusive));
+                else if (low == high) {
+                    lowerInclusive = true;
+                    highInclusive = true;
                 }
+                ranges.add(range(
+                        range.getType(),
+                        low,
+                        lowerInclusive,
+                        high,
+                        highInclusive));
                 // Set the low value to the high+1 for the next range split
                 low = high + 1;
             }

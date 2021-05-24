@@ -174,7 +174,7 @@ public class TestTileDBQueries
     @Test
     public void testCreate1DVectorTinyInt()
     {
-        String arrayName = "test_create_tinyint";
+        String arrayName = "test_create_table_tinyint";
         // Tinyint
         dropArray(arrayName);
         create1DVectorTinyIntDimension(arrayName);
@@ -477,7 +477,7 @@ public class TestTileDBQueries
     public void testCreate1DVectorBigInt()
     {
         // BigInt
-        String arrayName = "test_create_bigint";
+        String arrayName = "test_create_table_bigint";
         dropArray(arrayName);
         create1DVector(arrayName);
 
@@ -626,7 +626,8 @@ public class TestTileDBQueries
     public void testCreateTableEncrypted() throws Exception
     {
         // Integer
-        String arrayName = "test_create_encrypted";
+        String arrayName = "test_create_table_encrypted";
+        dropArray(arrayName);
         String encryptionKey = "0123456789abcdeF0123456789abcdeF";
 
         create1DVectorStringEncrypted(arrayName, encryptionKey);
@@ -669,7 +670,7 @@ public class TestTileDBQueries
     public void testTimeTraveling() throws Exception
     {
         // BigInt
-        String arrayName = "test_create_bigint";
+        String arrayName = "test_time_traveling";
         dropArray(arrayName);
         create1DVector(arrayName);
 
@@ -761,7 +762,7 @@ public class TestTileDBQueries
     public void testTimeTravelingEncrypted() throws Exception
     {
         // BigInt
-        String arrayName = "test_create_bigint";
+        String arrayName = "test_time_traveling_encrypted";
         String encryptionKey = "0123456789abcdeF0123456789abcdeF";
         create1DVectorEncrypted(arrayName, encryptionKey);
 
@@ -867,6 +868,7 @@ public class TestTileDBQueries
     public void testInsert()
     {
         String arrayName = "test_insert";
+        dropArray(arrayName);
         create1DVector(arrayName);
 
         String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
@@ -888,6 +890,7 @@ public class TestTileDBQueries
     public void testDimensionSlice()
     {
         String arrayName = "test_dim_slice";
+        dropArray(arrayName);
         create1DVector(arrayName);
 
         String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
