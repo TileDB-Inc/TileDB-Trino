@@ -41,13 +41,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
 import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
 import static io.trino.spi.predicate.Range.range;
-import static io.trino.spi.predicate.Utils.nativeValueToBlock;
 import static io.trino.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
@@ -223,7 +221,7 @@ public class TileDBSplitManager
         boolean maxFromNonEmptyDomain = true;
         // Number of buckets is 1 more thank number of splits (i.e. split 1 time into two buckets)
         // Only long dimensions can be split with naive algorithm
-        if (!REAL.equals(range.getType()) && range.getType().getJavaType() == long.class) {
+        if (!REAL.equals(range.getType()) && nonEmptyDomain.getFirst() != null && range.getType().getJavaType() == long.class) {
             long min = (Long) ConvertUtils.convert(nonEmptyDomain.getFirst(), Long.class);
             if (range.getLowValue().isPresent()) {
                 min = (Long) range.getLowBoundedValue();
@@ -283,9 +281,9 @@ public class TileDBSplitManager
                 if (low != high || range.isSingleValue()) {
                     ranges.add(range(
                             range.getType(),
-                            Optional.of(nativeValueToBlock(range.getType(), low)),
+                            low,
                             lowerInclusive,
-                            Optional.of(nativeValueToBlock(range.getType(), high)),
+                            high,
                             highInclusive));
                 }
                 // Set the low value to the high+1 for the next range split
