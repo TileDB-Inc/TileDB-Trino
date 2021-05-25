@@ -55,7 +55,7 @@ stages:
             displayName: 'GitHub Release'
             inputs:
               gitHubConnection: github_tiledb
-              repositoryName: TileDB-Inc/TileDB-Presto
+              repositoryName: TileDB-Inc/TileDB-Trino
               tag: $(Build.SourceBranchName)
               action: "edit"
               assets: $(Build.BinariesDirectory)/jars/*.jar

@@ -1,6 +1,6 @@
 # Limitations
 
-The TileDB connector supports most of Presto functionality. Below is a
+The TileDB connector supports most of Trino functionality. Below is a
 list of the features not currently supported.
 
 ## Encrypted Arrays
@@ -15,7 +15,7 @@ open an array at a specific timestamp.
 
 ## Datatypes
 
-TileDB Presto connector supports the following SQL datatypes:
+TileDB Trino connector supports the following SQL datatypes:
 
 -   BOOLEAN
 -   TINYINT
@@ -33,8 +33,8 @@ No other datatypes are supported.
 
 ### Unsigned Integers 
 
-The TileDB Presto connector does not have full support for unsigned values.
-Presto and all connectors are written in Java, and Java does not have unsigned
+The TileDB Trino connector does not have full support for unsigned values.
+Trino and all connectors are written in Java, and Java does not have unsigned
 values. As a result of this Java limitation, an unsigned 64-bit integer can
 overflow if it is larger than `2^63 - 1`. Unsigned integers that are 8, 16 or
 32 bits are treated as larger integers. For instance, an unsigned 32-bit value
@@ -45,7 +45,7 @@ is read into a Java type of `long`.
 For `varchar`, and `char` datatypes the special case of `char(1)` or `varchar(1)`
 is stored on disk as a fixed-sized attribute of size 1. Any `char`/`varchar` greater
 than 1 is stored as a variable-length attribute in TileDB. TileDB **will not** enforce
-the length parameter but Presto will for inserts.
+the length parameter but Trino will for inserts.
 
 ## Decimal Type
 

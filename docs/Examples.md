@@ -1,6 +1,6 @@
 # Examples
 
-Below are various examples for querying data with the TileDB Presto connector.
+Below are various examples for querying data with the TileDB Trino connector.
 
 ## SQL Examples
 
@@ -38,8 +38,8 @@ EXPLAIN ANALYZE SELECT * FROM tiledb.tiledb."file:///opt/tiledb_example_arrays/d
 
 ## Creating a TileDB Array
 
-It is possible to create TileDB array from Presto. Not all array schema
-options are currently supported from Presto though (see [Limitations](Limitations.md#create-table)
+It is possible to create TileDB array from Trino. Not all array schema
+options are currently supported from Trino though (see [Limitations](Limitations.md#create-table)
 for more details).
 
 Minimum create table:
@@ -63,7 +63,7 @@ CREATE TABLE region(
 
 ## Inserting Data
 
-Data can be inserted into TileDB arrays through Presto. Inserts can be from
+Data can be inserted into TileDB arrays through Trino. Inserts can be from
 another table or individual values.
 
 Copy data from one table to another:
