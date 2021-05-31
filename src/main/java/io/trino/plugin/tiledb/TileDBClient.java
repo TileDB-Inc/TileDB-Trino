@@ -75,13 +75,7 @@ public class TileDBClient
         this.config = requireNonNull(config, "config is null");
         try {
             // Create context
-            Config tileDBConfig = new Config();
-            if (config.getAwsAccessKeyId() != null && !config.getAwsAccessKeyId().isEmpty()
-                    && config.getAwsSecretAccessKey() != null && !config.getAwsSecretAccessKey().isEmpty()) {
-                tileDBConfig.set("vfs.s3.aws_access_key_id", config.getAwsAccessKeyId());
-                tileDBConfig.set("vfs.s3.aws_secret_access_key", config.getAwsSecretAccessKey());
-            }
-            ctx = new Context(tileDBConfig);
+            ctx = new Context(buildConfig());
             //tileDBConfig.close();
         }
         catch (TileDBError tileDBError) {
@@ -117,11 +111,11 @@ public class TileDBClient
     }
 
     /**
-    * Helper function to add a table to the catalog
-    *
-    * @param schema schema to add table to
-    * @param arrayUri uri of array/table
-    */
+     * Helper function to add a table to the catalog
+     *
+     * @param schema schema to add table to
+     * @param arrayUri uri of array/table
+     */
     public TileDBTable addTableFromURI(Context localCtx, String schema, URI arrayUri)
     {
         return addTableFromURI(localCtx, schema, arrayUri, null, null);
@@ -249,6 +243,8 @@ public class TileDBClient
         try {
             TileDBObject.remove(ctx, handle.getURI());
             schemas.get(handle.getSchemaName()).remove(handle.getTableName());
+            ctx.close();
+            ctx = new Context(buildConfig());
         }
         catch (TileDBError tileDBError) {
             throw new TrinoException(TILEDB_DROP_TABLE_ERROR, tileDBError);
@@ -261,9 +257,30 @@ public class TileDBClient
             Context localCtx = buildContext(session);
             TileDBObject.remove(localCtx, handle.getURI());
             schemas.get(handle.getSchemaName()).remove(handle.getTableName());
+            ctx.close();
+            ctx = new Context(buildConfig());
         }
         catch (TileDBError tileDBError) {
             throw new TrinoException(TILEDB_DROP_TABLE_ERROR, tileDBError);
+        }
+    }
+
+    public Config buildConfig()
+    {
+        try {
+            // Create context
+            Config tileDBConfig = new Config();
+            if (config.getAwsAccessKeyId() != null && !config.getAwsAccessKeyId().isEmpty()
+                    && config.getAwsSecretAccessKey() != null && !config.getAwsSecretAccessKey().isEmpty()) {
+                tileDBConfig.set("vfs.s3.aws_access_key_id", config.getAwsAccessKeyId());
+                tileDBConfig.set("vfs.s3.aws_secret_access_key", config.getAwsSecretAccessKey());
+            }
+            return tileDBConfig;
+            //tileDBConfig.close();
+        }
+        catch (TileDBError tileDBError) {
+            // Print stacktrace, this produces an error client side saying "internal error"
+            throw new TrinoException(TILEDB_CONTEXT_ERROR, tileDBError);
         }
     }
 
