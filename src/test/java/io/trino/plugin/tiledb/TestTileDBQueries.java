@@ -1148,6 +1148,79 @@ public class TestTileDBQueries
     }
 
     /**
+     * Creates an one-dimensional array to test dimension filtering.
+     */
+    @Test
+    public void testDimensionFiltering()
+    {
+        String arrayName = "test_dimension_filtering";
+        dropArray(arrayName);
+        create1DVector(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "bigint", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .build());
+        String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
+                "(0, 10), (3, 13), (5, 15), (6, 15), (7, 15)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql1 = format("SELECT * FROM %s WHERE x > 6 ORDER BY x ASC", arrayName);
+        String selectSql2 = format("SELECT * FROM %s WHERE x <= 6 ORDER BY x ASC", arrayName);
+        String selectSql3 = format("SELECT * FROM %s WHERE x > 2 ORDER BY x ASC", arrayName);
+        String selectSql4 = format("SELECT * FROM %s WHERE x >= 3 ORDER BY x ASC", arrayName);
+        String selectSql5 = format("SELECT * FROM %s WHERE x = 5 ORDER BY x ASC", arrayName);
+        String selectSql6 = format("SELECT * FROM %s WHERE x > 100 ORDER BY x ASC", arrayName);
+        String selectSql7 = format("SELECT * FROM %s WHERE a1 > 100 ORDER BY x ASC", arrayName);
+        MaterializedResult selectResult1 = computeActual(selectSql1);
+        MaterializedResult selectResult2 = computeActual(selectSql2);
+        MaterializedResult selectResult3 = computeActual(selectSql3);
+        MaterializedResult selectResult4 = computeActual(selectSql4);
+        MaterializedResult selectResult5 = computeActual(selectSql5);
+        MaterializedResult selectResult6 = computeActual(selectSql6);
+        MaterializedResult selectResult7 = computeActual(selectSql7);
+
+        assertEquals(selectResult1, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .row((long) 7, 15)
+                .build());
+
+        assertEquals(selectResult2, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .row((long) 0, 10)
+                .row((long) 3, 13)
+                .row((long) 5, 15)
+                .row((long) 6, 15)
+                .build());
+
+        assertEquals(selectResult3, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .row((long) 3, 13)
+                .row((long) 5, 15)
+                .row((long) 6, 15)
+                .row((long) 7, 15)
+                .build());
+
+        assertEquals(selectResult4, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .row((long) 3, 13)
+                .row((long) 5, 15)
+                .row((long) 6, 15)
+                .row((long) 7, 15)
+                .build());
+
+        assertEquals(selectResult5, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .row((long) 5, 15)
+                .build());
+
+        assertEquals(selectResult6, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .build());
+
+        assertEquals(selectResult7, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    /**
      * Reads a two-dimensional dense array with nullable attributes.
      */
     @Test
