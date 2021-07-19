@@ -19,14 +19,17 @@ import io.airlift.slice.Slices;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
+import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.NativeArray;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.Query;
+import io.tiledb.java.api.QueryCondition;
 import io.tiledb.java.api.QueryStatus;
 import io.tiledb.java.api.Stats;
 import io.tiledb.java.api.TileDBError;
+import io.tiledb.libtiledb.tiledb_query_condition_op_t;
 import io.trino.plugin.tiledb.util.Util;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
@@ -49,6 +52,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
@@ -61,6 +65,10 @@ import static io.tiledb.java.api.QueryStatus.TILEDB_COMPLETED;
 import static io.tiledb.java.api.QueryStatus.TILEDB_INCOMPLETE;
 import static io.tiledb.java.api.QueryStatus.TILEDB_UNINITIALIZED;
 import static io.tiledb.java.api.Types.getJavaType;
+import static io.tiledb.libtiledb.tiledb_query_condition_combination_op_t.TILEDB_AND;
+import static io.tiledb.libtiledb.tiledb_query_condition_op_t.TILEDB_EQ;
+import static io.tiledb.libtiledb.tiledb_query_condition_op_t.TILEDB_GE;
+import static io.tiledb.libtiledb.tiledb_query_condition_op_t.TILEDB_LE;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_CURSOR_ERROR;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.trino.plugin.tiledb.TileDBSessionProperties.getEnableStats;
@@ -103,6 +111,11 @@ public class TileDBRecordCursor
     private Map<String, Pair<Long, Long>> queryResultBufferElements;
     private Map<String, List<Pair<Long, Long>>> functionTimings;
     private final String queryId;
+
+    /**
+     * TileDB Context
+     */
+    private final Context ctx;
 
     /**
      * TileDB Query status
@@ -205,13 +218,15 @@ public class TileDBRecordCursor
     private long numRecordsRead;
 
     /**
-     * The zero-epoch OffsetDateTime
+     * Empty query attributes are String attributes that have been queried with the empty string. They are saved separately to avoid using the [null, null] domain on them which would return all tuples instead of the ones with the empty string.
      */
+    public static ArrayList<String> emptyQueryAttributes = new ArrayList<>();
 
     private static final OffsetDateTime zeroDateTime = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC);
 
-    public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query)
+    public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query) throws TileDBError
     {
+        this.ctx = tileDBClient.buildContext(session);
         this.tileDBClient = requireNonNull(tileDBClient, "tileDBClient is null");
         this.columnHandles = columnHandles;
         this.array = array;
@@ -428,6 +443,7 @@ public class TileDBRecordCursor
             HashMap<String, Pair> nonEmptyDomain = this.array.nonEmptyDomain();
 
             int dimIdx = 0;
+            //iterate dimensions
             for (Dimension dimension : dimensions) {
                 Pair dimBounds = getBoundsForDimension(split, dimension, nonEmptyDomain);
                 Class classType = getJavaType(dimension.getType());
@@ -437,7 +453,6 @@ public class TileDBRecordCursor
                     if (dimBounds.getFirst().equals(dimBounds.getSecond())) {
                         continue;
                     }
-
                     query.addRangeVar(dimIdx, dimBounds.getFirst().toString(), dimBounds.getSecond().toString());
                 }
                 else {
@@ -449,9 +464,132 @@ public class TileDBRecordCursor
                 dimIdx++;
                 dimension.close();
             }
+            //iterate attributes
+            HashMap<String, Attribute> attributes = arraySchema.getAttributes();
+            Iterator it = attributes.entrySet().iterator();
+            QueryCondition finalQueryCondition = null;
+            while (it.hasNext()) {
+                Map.Entry pair = (Map.Entry) it.next();
+                Attribute att = (Attribute) pair.getValue();
+                Pair attBounds = getBoundsForAttribute(split, att);
+                boolean isString = att.getType().javaClass().equals(String.class);
+                if ((attBounds.getFirst() != null || attBounds.getSecond() != null)) {
+                    if (attBounds.getFirst() == null) {
+                        QueryCondition cond = conditionForBound(att, isString, attBounds.getSecond(), TILEDB_LE);
+                        if (finalQueryCondition == null) {
+                            finalQueryCondition = cond;
+                        }
+                        else {
+                            finalQueryCondition = finalQueryCondition.combine(cond, TILEDB_AND);
+                        }
+                    }
+                    else if (attBounds.getSecond() == null) {
+                        QueryCondition cond = conditionForBound(att, isString, attBounds.getFirst(), TILEDB_GE);
+                        if (finalQueryCondition == null) {
+                            finalQueryCondition = cond;
+                        }
+                        else {
+                            finalQueryCondition = finalQueryCondition.combine(cond, TILEDB_AND);
+                        }
+                    }
+                    else {
+                        QueryCondition cond1 = conditionForBound(att, isString, attBounds.getFirst(), TILEDB_GE);
+                        QueryCondition cond2 = conditionForBound(att, isString, attBounds.getSecond(), TILEDB_LE);
+                        QueryCondition cond3 = cond1.combine(cond2, TILEDB_AND);
+
+                        if (finalQueryCondition == null) {
+                            finalQueryCondition = cond3;
+                        }
+                        else {
+                            finalQueryCondition = finalQueryCondition.combine(cond3, TILEDB_AND);
+                        }
+                    }
+                }
+                LOG.info("Query %s setting range for attribute %s to [%s, %s]", queryId, att.getName(), attBounds.getFirst(), attBounds.getSecond());
+            }
+            if (finalQueryCondition != null) {
+                query.setCondition(finalQueryCondition);
+            }
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        recordFunctionTime("setRanges", timer);
+    }
+
+    /**
+     * Returns the Query condition for the given bound.
+     * @param attr The attribute
+     * @param isString True if the attribute is String
+     * @param bound The bound
+     * @param op TIleDB operator
+     * @return The query Condition
+     * @throws TileDBError
+     */
+    private QueryCondition conditionForBound(Attribute attr, boolean isString, Object bound, tiledb_query_condition_op_t op) throws TileDBError
+    {
+        // handle the empty string cases
+        if (isString && bound != null && bound.toString().equals("")) {
+            if (attr.getNullable()) { //not necessary after https://github.com/TileDB-Inc/TileDB/pull/2507 fix. //TODO
+                return new QueryCondition(ctx, attr.getName(), "".getBytes(), attr.getType().javaClass(), TILEDB_EQ);
+            }
+            else {
+                return new QueryCondition(ctx, attr.getName(), " ".getBytes(), attr.getType().javaClass(), TILEDB_EQ);
+            }
+        }
+        if (isString) {
+            bound = bound.toString().getBytes();
+        }
+        return new QueryCondition(ctx, attr.getName(), bound, attr.getType().javaClass(), op);
+    }
+
+    /**
+     * Compute a (lower, upper) bound for the given attribute based on the given split.
+     */
+    private Pair getBoundsForAttribute(TileDBSplit split, Attribute attribute) throws TileDBError
+    {
+        if (emptyQueryAttributes.contains(attribute.toString())) {
+            return new Pair<>("", "");
+        }
+        String name = attribute.getName();
+        Pair<Long, Long> timer = startTimer();
+        TupleDomain<ColumnHandle> tupleDomain = split.getTupleDomain();
+        checkState(tupleDomain.getDomains().isPresent(), "No domains in tuple domain");
+
+        Domain domainPredicate = tupleDomain.getDomains().get().entrySet()
+                .stream()
+                .filter(e -> ((TileDBColumnHandle) e.getKey()).getColumnName().equals(name))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+
+        if (domainPredicate == null || domainPredicate.isAll()) {
+            return new Pair<>(null, null);
         }
 
-        recordFunctionTime("setRanges", timer);
+        Object lowerBound = null;
+        Object upperBound = null;
+
+        try {
+            List<Range> orderedRanges = domainPredicate.getValues().getRanges().getOrderedRanges();
+            Class attType = attribute.getType().javaClass();
+
+            for (Range range : orderedRanges) {
+                Pair bounds = getBoundsForTrinoRange(range, attribute.getType());
+                lowerBound = bounds.getFirst() == null ? null : ConvertUtils.convert(bounds.getFirst(), attType);
+                upperBound = bounds.getSecond() == null ? null : ConvertUtils.convert(bounds.getSecond(), attType);
+            }
+        }
+        catch (NullPointerException exception) {
+            LOG.info("Attribute %s has no bounds", attribute.getName());
+        }
+        //We keep a record of all the attributes in which an empty-lookup was queried.
+        if (attribute.getType().javaClass().equals(String.class) && lowerBound != null && upperBound != null && lowerBound.equals("") && upperBound.equals("")) {
+            emptyQueryAttributes.add(attribute.toString());
+        }
+
+        recordFunctionTime("getBoundsForAttribute", timer);
+        return new Pair<>(lowerBound, upperBound);
     }
 
     /**

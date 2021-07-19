@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
@@ -73,7 +74,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -106,12 +106,16 @@ import static java.util.Objects.requireNonNull;
 public class TileDBMetadata
         implements ConnectorMetadata
 {
+    private static final Logger LOG = Logger.get(TileDBRecordCursor.class);
+
     private final String connectorId;
 
     private final TileDBClient tileDBClient;
 
     // Rollback stores a function to run to initiate a rollback sequence
     private final AtomicReference<Runnable> rollbackAction = new AtomicReference<>();
+
+    private static ArrayList<ColumnHandle> columnsWithPredicates = new ArrayList();
 
     @Inject
     public TileDBMetadata(TileDBConnectorId connectorId, TileDBClient tileDBClient)
@@ -160,18 +164,37 @@ public class TileDBMetadata
         ImmutableList.Builder<LocalProperty<ColumnHandle>> localProperties = ImmutableList.builder();
 
         Map<String, ColumnHandle> columns = getColumnHandles(session, tableHandle);
+        boolean hasPredicate = constraint.predicate().isPresent();
 
         // Predicates are fetched as summary of constraints
         TupleDomain<ColumnHandle> effectivePredicate = constraint.getSummary();
-        Set<ColumnHandle> dimensionHandles = columns.values().stream()
-                .filter(e -> ((TileDBColumnHandle) e).getIsDimension())
-                .collect(Collectors.toSet());
+        Set<ColumnHandle> columnHandles = new HashSet<>();
+        for (ColumnHandle e : columns.values()) {
+            if (hasPredicate) {
+                columnsWithPredicates.add(e);
+            }
+            //columns that are not included in the columnHandles are filtered by presto, not tileDB. Strings and queries with 'OR' are not pushed down for now.
+            if ((((effectivePredicate.getDomains().get().get(e) != null) &&
+                    (effectivePredicate.getDomains().get().get(e).getValues().getRanges().getOrderedRanges().size() > 1)))) { //having more than one range effectively means it is an OR condition, which is not yet supported by the core library.
+                LOG.info("Column %s has an OR condition which is not yet supported by TileDB's native QueryCondition. The filtering will happen by Trino.", ((TileDBColumnHandle) e).getColumnName());
+            }
+            else if (columnsWithPredicates.contains(e)) { //Predicates are not supported by the QueryCondition, thus we need to leave this to Presto.
+                LOG.info("Column %s uses a Predicate which is not yet supported by TileDB's native QueryCondition. The filtering will happen by Trino.", ((TileDBColumnHandle) e).getColumnName());
+            }
+            else {
+                columnHandles.add(e);
+            }
+        }
+
+//        Uncomment to include all columns
+//        columns that are not included in the columnHandles are filtered by presto, not tileDB
+//        Set<ColumnHandle> columnHandles = new HashSet<>(columns.values());
 
         List<ColumnHandle> columnsInLayout;
         if (desiredColumns.isPresent()) {
             // Add all dimensions since dimensions will always be returned by tiledb
             Set<ColumnHandle> desiredColumnsWithDimension = new HashSet<>(desiredColumns.get());
-            desiredColumnsWithDimension.addAll(dimensionHandles);
+            desiredColumnsWithDimension.addAll(columnHandles);
             columnsInLayout = new ArrayList<>(desiredColumnsWithDimension);
         }
         else {
@@ -179,7 +202,7 @@ public class TileDBMetadata
         }
 
         // The only enforceable constraints are ones for dimension columns
-        Map<ColumnHandle, Domain> enforceableDimensionDomains = new HashMap<>(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.in(dimensionHandles)));
+        Map<ColumnHandle, Domain> enforceableDomains = new HashMap<>(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.in(columnHandles)));
 
         if (!getSplitOnlyPredicates(session)) {
             try {
@@ -195,9 +218,9 @@ public class TileDBMetadata
                 HashMap<String, Pair> nonEmptyDomain = array.nonEmptyDomain();
                 // Find any dimension which do not have predicates and add one for the entire domain.
                 // This is required so we can later split on the predicates
-                for (ColumnHandle dimensionHandle : dimensionHandles) {
-                    if (!enforceableDimensionDomains.containsKey(dimensionHandle)) {
-                        TileDBColumnHandle columnHandle = ((TileDBColumnHandle) dimensionHandle);
+                for (ColumnHandle handle : columnHandles) {
+                    if (!enforceableDomains.containsKey(handle)) {
+                        TileDBColumnHandle columnHandle = ((TileDBColumnHandle) handle);
                         if (nonEmptyDomain.containsKey(columnHandle.getColumnName())) {
                             Pair<Object, Object> domain = nonEmptyDomain.get(columnHandle.getColumnName());
                             Object nonEmptyMin = domain.getFirst();
@@ -222,8 +245,8 @@ public class TileDBMetadata
                                         ConvertUtils.convert(nonEmptyMax, type.getJavaType()), true);
                             }
 
-                            enforceableDimensionDomains.put(
-                                    dimensionHandle,
+                            enforceableDomains.put(
+                                    handle,
                                     Domain.create(ValueSet.ofRanges(range), false));
                         }
                     }
@@ -235,14 +258,14 @@ public class TileDBMetadata
             }
         }
 
-        TupleDomain<ColumnHandle> enforceableTupleDomain = TupleDomain.withColumnDomains(enforceableDimensionDomains);
+        TupleDomain<ColumnHandle> enforceableTupleDomain = TupleDomain.withColumnDomains(enforceableDomains);
         TupleDomain<ColumnHandle> remainingTupleDomain;
 
         // The remaining tuples non-enforced by TileDB are attributes
-        remainingTupleDomain = TupleDomain.withColumnDomains(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.not(Predicates.in(dimensionHandles))));
+        remainingTupleDomain = TupleDomain.withColumnDomains(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.not(Predicates.in(columnHandles))));
 
         ConnectorTableLayout layout = new ConnectorTableLayout(
-                new TileDBTableLayoutHandle(tableHandle, enforceableTupleDomain, dimensionHandles),
+                new TileDBTableLayoutHandle(tableHandle, enforceableTupleDomain, columnHandles),
                 Optional.of(columnsInLayout),
                 TupleDomain.all(),
                 Optional.empty(),
