@@ -145,6 +145,85 @@ public class TestTileDBQueries
     }
 
     @Test
+    public void testQueryCondition()
+    {
+        String arrayName = "test_query_condition";
+        dropArray(arrayName);
+        create1D2AVector(arrayName);
+
+        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
+        assertEquals(desc,
+                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
+                        .row("x", "bigint", "", "Dimension")
+                        .row("a1", "integer", "", "Attribute")
+                        .row("a2", "varchar", "", "Attribute")
+                        .row("a3", "real", "", "Attribute")
+                        .build());
+        String insertSql = format("INSERT INTO %s (x, a1, a2, a3) VALUES " +
+                "(0, 10, 'a', 300.0), (3, 13, 'b', 200.0), (5, 15, 'c', 1000.0), (6, 16, 'd', 1.0), (7, 124, 'e', 20.0)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql1 = format("SELECT * FROM %s WHERE a1 > 100 ORDER by x ASC", arrayName); // pushed down
+        String selectSql2 = format("SELECT * FROM %s WHERE a2 = 'c' ORDER by x ASC", arrayName); // pushed down
+        String selectSql3 = format("SELECT * FROM %s WHERE a2 >= 'b' and a2 < 'e' ORDER by x ASC", arrayName); // pushed down
+        String selectSql4 = format("SELECT * FROM %s WHERE a1 > 15 and a1 < 100 ORDER by x ASC", arrayName); // pushed down
+        String selectSql5 = format("SELECT * FROM %s WHERE a1 > 15 or a1 < 12 ORDER by x ASC", arrayName); // not pushed down
+        String selectSql6 = format("SELECT * FROM %s WHERE a3 < 300 ORDER by x ASC", arrayName); // pushed down
+        String selectSql7 = format("SELECT * FROM %s WHERE a3 < 30 or a3 > 500 ORDER by x ASC", arrayName); // not pushed down
+        String selectSql8 = format("SELECT * FROM %s WHERE a1 > 15 AND a3 > 3 ORDER by x ASC", arrayName); // pushed down
+        MaterializedResult selectResult1 = computeActual(selectSql1);
+        MaterializedResult selectResult2 = computeActual(selectSql2);
+        MaterializedResult selectResult3 = computeActual(selectSql3);
+        MaterializedResult selectResult4 = computeActual(selectSql4);
+        MaterializedResult selectResult5 = computeActual(selectSql5);
+        MaterializedResult selectResult6 = computeActual(selectSql6);
+        MaterializedResult selectResult7 = computeActual(selectSql7);
+        MaterializedResult selectResult8 = computeActual(selectSql8);
+
+        assertEquals(selectResult1, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 7, 124, "e", 20.0f)
+                .build());
+
+        assertEquals(selectResult2, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 5, 15, "c", 1000.0f)
+                .build());
+
+        assertEquals(selectResult3, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 3, 13, "b", 200.0f)
+                .row((long) 5, 15, "c", 1000.0f)
+                .row((long) 6, 16, "d", 1.0f)
+                .build());
+
+        assertEquals(selectResult4, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 6, 16, "d", 1.0f)
+                .build());
+
+        assertEquals(selectResult5, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 0, 10, "a", 300.0f)
+                .row((long) 6, 16, "d", 1.0f)
+                .row((long) 7, 124, "e", 20.0f)
+                .build());
+
+        assertEquals(selectResult6, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 3, 13, "b", 200.0f)
+                .row((long) 6, 16, "d", 1.0f)
+                .row((long) 7, 124, "e", 20.0f)
+                .build());
+
+        assertEquals(selectResult7, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 5, 15, "c", 1000.0f)
+                .row((long) 6, 16, "d", 1.0f)
+                .row((long) 7, 124, "e", 20.0f)
+                .build());
+
+        assertEquals(selectResult8, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 7, 124, "e", 20.0f)
+                .build());
+
+        dropArray(arrayName);
+    }
+
+    @Test
     public void testCreateAllDataTypes()
     {
         String arrayName = "test_create_all_data_type";
@@ -1462,6 +1541,18 @@ public class TestTileDBQueries
         String createSql = format("CREATE TABLE %s(" +
                 "x bigint WITH (dimension=true), " +
                 "a1 integer" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
+    private void create1D2AVector(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x bigint WITH (dimension=true), " +
+                "a1 integer, " +
+                "a2 varchar, " +
+                "a3 real " +
                 ") WITH (uri='%s')", arrayName, arrayName);
         queryRunner.execute(createSql);
     }
