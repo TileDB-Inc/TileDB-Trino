@@ -369,7 +369,7 @@ public class TileDBRecordCursor
         // Allocate a NativeBuffer for the attribute, and the offsets (for var-len attributes).
         int bufferSize = getClampedBufferSize(maxBufferElements.getSecond().intValue(), type.getNativeSize());
         NativeArray valuesBuffer = new NativeArray(tileDBClient.getCtx(), bufferSize, type);
-        NativeArray validityMap = new NativeArray(tileDBClient.getCtx(), bufferSize, TILEDB_UINT8);
+        NativeArray validityMap;
 
         if (isVar) {
             // Allocate a buffer for the offsets
@@ -377,6 +377,7 @@ public class TileDBRecordCursor
             NativeArray offsetsBuffer = new NativeArray(tileDBClient.getCtx(), bufferSize, TILEDB_UINT64);
             queryBuffers.set(columnIndexLookup.get(field), new Pair<>(offsetsBuffer, valuesBuffer));
             if (isNullable) {
+                validityMap = new NativeArray(tileDBClient.getCtx(), offsetsBuffer.getSize(), TILEDB_UINT8);
                 query.setBufferNullable(field, offsetsBuffer, valuesBuffer, validityMap);
                 validityMaps.set(columnIndexLookup.get(field), validityMap);
             }
@@ -386,6 +387,7 @@ public class TileDBRecordCursor
         }
         else {
             if (isNullable) {
+                validityMap = new NativeArray(tileDBClient.getCtx(), bufferSize, TILEDB_UINT8);
                 query.setBufferNullable(field, valuesBuffer, validityMap);
                 validityMaps.set(columnIndexLookup.get(field), validityMap);
             }
