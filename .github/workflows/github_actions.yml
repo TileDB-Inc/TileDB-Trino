@@ -1,0 +1,90 @@
+name: TileDB-Trino
+
+on:
+  push:
+    tags:
+      - '*'
+    branches:
+      - 'master'
+  pull_request:
+
+jobs:
+  Test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-18.04, macos-10.15 ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: |
+          export JAVA_HOME=$JAVA_HOME_11_X64
+          mvn checkstyle:checkstyle
+        shell: bash
+        name: checkStyle
+
+      - run: |
+          export JAVA_HOME=$JAVA_HOME_11_X64
+          mvn clean package -DskipTests
+        shell: bash
+        name: checkFormat
+
+      - run: |
+          export JAVA_HOME=$JAVA_HOME_11_X64
+          mvn test
+        shell: bash
+        name: test
+
+      - run: |
+          set -e pipefail
+          # Display log files if the build failed
+          echo "Dumping log files for failed build"
+          echo "----------------------------------"
+          for f in $(find $BUILD_REPOSITORY_LOCALPATH -name *.dumpstream);
+            do echo "------"
+               echo $f
+               echo "======"
+               cat $f
+            done;
+        shell: bash
+        name: error_print
+        if: ${{ failure() }}
+
+
+  Release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [Test]
+    name: Create-Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set-up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '11'
+          check-latest: true
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: notlmn/release-with-changelog@v2
+        with:
+          header: 'Changes:'
+          include-hash: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create-Jars
+        run: set +e; mvn clean package -DskipTests; mkdir jars/; cp ./target/*.jar jars/
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: jars/*.jar
+          tag_name: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.tag_name }}
+          draft: false
+          prerelease: false
