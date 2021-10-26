@@ -1,6 +1,6 @@
 # TileDB Trino Connector
 
-[![Build Status](https://dev.azure.com/TileDB-Inc/CI/_apis/build/status/TileDB-Inc.TileDB-Trino?branchName=master)](https://dev.azure.com/TileDB-Inc/CI/_build/latest?definitionId=39&branchName=master)
+![TileDB-Trino CI](https://github.com/TileDB-Inc/TileDB-Trino/actions/workflows/github_actions.yml/badge.svg)
 
 TileDB is an efficient library for managing large-scale,
 multi-dimensional dense and sparse array data introducing a novel array format. For more information about TileDB
@@ -10,93 +10,14 @@ This connector allows running SQL on TileDB arrays via Trino.  The TileDB-Trino 
 projection and range queries.
 
 
-## Quickstart
-
-## Docker
-
-A quickstart Docker image is available. The docker image will start a single-node 
-Trino cluster and open the CLI Trino interface where SQL can be run.
-The Docker image includes two example tiledb arrays
-`/opt/tiledb_example_arrays/dense_global` and `/opt/tiledb_example_arrays/sparse_global`. 
-Simply run:
-
-```
-docker run -it --rm tiledb/tiledb-presto
-```
-
-or mount a local array into the Docker container with the `-v` option: 
-
-```
-docker run -it --rm -v /local/array/path:/data/local_array tiledb/tiledb-presto
-```
-
-In the above example, replace `/local/array/path` with the path to the
-array folder on your local machine. The `/data/local_array` path is the 
-path you will use within the Docker image to access `/local/array/path`
-(you can replace it with another path of your choice). 
-
-The TileDB presto connector supports most SQL operations from TrinoDB. Arrays
-can be referenced dynamically and are not required to be "pre-registered"
-with Trino. *No external service* (such as [Apache Hive](https://hive.apache.org/)) 
-is required.
- 
-Examples: 
-
-```
-show columns from "file:///opt/tiledb_example_arrays/dense_global";
-Column |  Type   | Extra |  Comment  
---------+---------+-------+-----------
- rows   | integer |       | Dimension 
- cols   | integer |       | Dimension 
- a      | integer |       | Attribute 
-
-```
-
-
-```
-select * from "file:///opt/tiledb_example_arrays/dense_global" WHERE rows = 3 AND cols between 1 and 2;
- rows | cols | a 
-------+------+---
-    3 |    1 | 5 
-    3 |    2 | 6 
-
-```
-
-Trino uses the form of `catalog`.`schema`.`table_name` for querying. TileDB
-does not have a concept of a schema, so any valid string can be used for the 
-schema name when querying. `tiledb` is used for convenience in the examples.
-`table_name` is the array URI and can be local (file://) or remote (s3://).
-
-### Running SQL from a File or Command Line Argument
-
-It is possible to specify a file that contains sql to be run from the docker
-image:
-
-```
-echo 'select * from "file:///opt/tiledb_example_arrays/dense_global" limit 10;' > example.sql
-docker run -it --rm -v ${PWD}/example.sql:/tmp/example.sql tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --file /tmp/example.sql
-```
-
-You can also run a sql statement directly:
-
-```
-docker run -it --rm tiledb/tiledb-presto /opt/presto/bin/entrypoint.sh --execute 'select * from "file:///opt/tiledb_example_arrays/dense_global" limit 10;'
-```
-
-
-
-For more examples see [docs/Examples.md](docs/Examples.md).
-
-For custom connector SQL options see [docs/SQL.md](docs/SQL.md).
-
 ## Installation
 
-Currently this connector is built as a plugin. It must be packaged and
+Currently, this connector is built as a plugin. It must be packaged and
 installed on the TrinoDB instances.
 
 ### Latest Release
 
-Download the [latest release](https://github.com/TileDB-Inc/presto-tiledb/releases/latest)
+Download the [latest release](https://github.com/TileDB-Inc/TileDB-Trino/releases/latest)
 and skip to the section
 [Installation on existing Trino instance](#Installation-on-existing-Trino-instance).
 
@@ -114,16 +35,37 @@ Tests can be skipped by adding `-DskipTests`
 ./mvnw package -DskipTests
 ```
 
-### Installation on an existing Trino instance
+### Installation on a Trino instance
 
-If you are installing the plugin on an existing Trino instance, such as Amazon
-EMR, you need to copy the `target/presto-tiledb-$VERSION` folder
-to a `tiledb` directory under the plugin directory on echo Trino node.
+First clone [Trino](https://github.com/TileDB-Inc/TileDB-Trino/releases/latest)
+```
+git clone https://github.com/trinodb/trino.git
+```
+Install Trino
+```
+./mvnw clean install -DskipTests
+```
 
-#### AWS EMR 
-
-Using Amazon EMR `target/presto-tiledb-$VERSION` needs to be copied to
-`/usr/lib/presto/plugin/tiledb/`
+Create a TileDB directory
+```
+mkdir trino/core/trino-server/target/trino-server-***-SNAPSHOT/plugin/tiledb
+```
+Copy the TileDB-Trino jars to the TileDB directory
+```
+cp TileDB-Trino/target/*.jar trino/core/trino-server/target/trino-server-***-SNAPSHOT/plugin/tiledb
+```
+Create an "etc" folder which includes the tiledb.properties file and move it to:
+```
+trino/core/trino-server/target/trino-server-***-SNAPSHOT/
+```
+Launch the Trino Server
+```
+trino/core/trino-server/target/trino-server-364-SNAPSHOT/bin/launcher run
+```
+Launch the Trino-CLI with the TileDB plugin
+```
+./trino/client/trino-cli/target/trino-cli-***-SNAPSHOT-executable.jar --schema tiledb --catalog tiledb
+```
 
 ### Configuration
 
@@ -136,7 +78,7 @@ See [docs/Limitations.md](docs/Limitations.md).
 ## Arrays as SQL Tables
 
 When a multi-dimensional array is queried in Trino, the dimensions are converted
-to table columns for the result set. TileDB array attributes attributes are also returned as columns.
+to table columns for the result set. TileDB array attributes are also returned as columns.
 
 ### Dense Arrays
 
