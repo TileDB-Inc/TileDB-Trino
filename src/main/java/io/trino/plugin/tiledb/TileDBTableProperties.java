@@ -28,7 +28,6 @@ import static io.trino.spi.session.PropertyMetadata.stringProperty;
 public class TileDBTableProperties
 {
     public static final String URI = "uri";
-    public static final String ArrayType = "type";
     public static final String CellOrder = "cell_order";
     public static final String TileOrder = "tile_order";
     public static final String Capacity = "capacity";
@@ -44,11 +43,6 @@ public class TileDBTableProperties
                         URI,
                         "URI for array to be created at",
                         null,
-                        false),
-                stringProperty(
-                        ArrayType,
-                        "Array type [DENSE, SPARSE]",
-                        "SPARSE",
                         false),
                 stringProperty(
                         CellOrder,
@@ -85,11 +79,6 @@ public class TileDBTableProperties
     public static String getUri(Map<String, Object> tableProperties)
     {
         return (String) tableProperties.get(URI);
-    }
-
-    public static String getArrayType(Map<String, Object> tableProperties)
-    {
-        return (String) tableProperties.get(ArrayType);
     }
 
     public static String getCellOrder(Map<String, Object> tableProperties)

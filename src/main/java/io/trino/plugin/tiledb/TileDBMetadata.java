@@ -22,7 +22,6 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
-import io.tiledb.java.api.ArrayType;
 import io.tiledb.java.api.Attribute;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
@@ -78,7 +77,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
-import static io.tiledb.java.api.ArrayType.TILEDB_DENSE;
 import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
 import static io.tiledb.java.api.Constants.TILEDB_VAR_NUM;
 import static io.tiledb.java.api.QueryType.TILEDB_READ;
@@ -531,29 +529,12 @@ public class TileDBMetadata
                 uri = table;
             }
 
-            ArrayType arrayType;
-            // Get array type from table properties
-            String arrayTypeStr = ((String) properties.get(TileDBTableProperties.ArrayType)).toUpperCase();
-
-            // Set array type based on string value
-            if (arrayTypeStr.equals("DENSE")) {
-                arrayType = TILEDB_DENSE;
-            }
-            else if (arrayTypeStr.equals("SPARSE")) {
-                arrayType = TILEDB_SPARSE;
-            }
-            else {
-                throw new TileDBError("Invalid array type set, must be one of [DENSE, SPARSE]");
-            }
-
             // Create array schema
-            ArraySchema arraySchema = new ArraySchema(localCtx, arrayType);
+            ArraySchema arraySchema = new ArraySchema(localCtx, TILEDB_SPARSE);
             io.tiledb.java.api.Domain domain = new io.tiledb.java.api.Domain(localCtx);
 
             // If we have a sparse array we need to set capacity
-            if (arrayType == TILEDB_SPARSE) {
-                arraySchema.setCapacity((long) properties.get(TileDBTableProperties.Capacity));
-            }
+            arraySchema.setCapacity((long) properties.get(TileDBTableProperties.Capacity));
 
             if (properties.containsKey(TileDBTableProperties.OffsetsFilterList)) {
                 String filters = TileDBTableProperties.getOffsetsFilterList(properties);
