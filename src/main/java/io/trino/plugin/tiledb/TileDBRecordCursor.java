@@ -276,7 +276,7 @@ public class TileDBRecordCursor
         for (int i = 0; i < columnHandles.size(); i++) {
             columnIndexLookup.put(columnHandles.get(i).getColumnName(), i);
         }
-        HashMap<String, Pair<Integer, Integer>> estimations = new HashMap<>();
+        HashMap<String, Pair<Long, Long>> estimations = new HashMap<>();
         String name;
 
         // Build attribute array to avoid making calls to ArraySchema.getAttribute(string)
@@ -338,7 +338,7 @@ public class TileDBRecordCursor
         totalNumRecordsUB = estimations.values().iterator().next().getSecond();
 
         // Build buffers for each column (attribute) in the query.
-        for (Map.Entry<String, Pair<Integer, Integer>> maxSize : estimations.entrySet()) {
+        for (Map.Entry<String, Pair<Long, Long>> maxSize : estimations.entrySet()) {
             String columnName = maxSize.getKey();
 
             // Check to see if column is in request list, if not don't set a buffer
@@ -357,7 +357,7 @@ public class TileDBRecordCursor
     /**
      * Allocates a NativeArray buffer for the given attribute and adds it to the query object.
      */
-    private void initQueryBufferForField(String field, Pair<Integer, Integer> maxBufferElements) throws TileDBError
+    private void initQueryBufferForField(String field, Pair<Long, Long> maxBufferElements) throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
         boolean isAttribute = arraySchema.getAttributes().containsKey(field);

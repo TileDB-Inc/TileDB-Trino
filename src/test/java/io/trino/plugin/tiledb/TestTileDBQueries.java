@@ -1470,11 +1470,11 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testDenseWriteReadNullable()
+    public void testWriteReadNullable()
     {
-        String arrayName = "test_dense_write_read";
+        String arrayName = "test_write_read";
         dropArray(arrayName);
-        create1DVectorDense(arrayName);
+        create1DVectorNullable(arrayName);
 
         String insertSql = format("INSERT INTO %s (x, a1) VALUES " +
                 "(1, 10), (2, 13), (3, null), (4, 15), (5, 19), (6, 10), (7, 5), (8, 1), (9, 7) ", arrayName);
@@ -1545,6 +1545,16 @@ public class TestTileDBQueries
         queryRunner.execute(createSql);
     }
 
+    private void create1DVectorNullable(String arrayName)
+    {
+        QueryRunner queryRunner = getQueryRunner();
+        String createSql = format("CREATE TABLE %s(" +
+                "x bigint WITH (dimension=true), " +
+                "a1 integer WITH (nullable=true)" +
+                ") WITH (uri='%s')", arrayName, arrayName);
+        queryRunner.execute(createSql);
+    }
+
     private void create1D2AVector(String arrayName)
     {
         QueryRunner queryRunner = getQueryRunner();
@@ -1563,16 +1573,6 @@ public class TestTileDBQueries
         String createSql = format("CREATE TABLE %s(" +
                 "x bigint WITH (dimension=true) " +
                 ") WITH (uri='%s')", arrayName, arrayName);
-        queryRunner.execute(createSql);
-    }
-
-    private void create1DVectorDense(String arrayName)
-    {
-        QueryRunner queryRunner = getQueryRunner();
-        String createSql = format("CREATE TABLE %s(" +
-                "x integer WITH (dimension=true, lower_bound=1, upper_bound=9, extent=2), " +
-                "a1 integer  WITH (nullable=true)" +
-                ") WITH (uri='%s', type='DENSE')", arrayName, arrayName);
         queryRunner.execute(createSql);
     }
 
