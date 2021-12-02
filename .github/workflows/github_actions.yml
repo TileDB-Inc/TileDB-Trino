@@ -1,6 +1,7 @@
 name: TileDB-Trino
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - '*'
