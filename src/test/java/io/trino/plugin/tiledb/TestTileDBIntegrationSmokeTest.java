@@ -23,8 +23,6 @@ import io.trino.testing.QueryRunner;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import java.util.Collections;
-
 import static io.tiledb.java.api.TileDBObject.remove;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.trino.spi.type.VarcharType.VARCHAR;
@@ -83,13 +81,6 @@ public class TestTileDBIntegrationSmokeTest
                         "   shippriority integer COMMENT 'Attribute',\n" +
                         "   comment varchar COMMENT 'Attribute'\n" +
                         ")");
-    }
-
-    @Test
-    public void testConcurrentScans()
-    {
-        String unionMultipleTimes = String.join(" UNION ALL ", Collections.nCopies(1, "SELECT * FROM orders"));
-        this.assertQuery("SELECT sum(if(rand() >= 0, orderkey)) FROM (" + unionMultipleTimes + ")", "VALUES 11246812500");
     }
 
     @AfterClass(alwaysRun = true)

@@ -1528,10 +1528,10 @@ public class TestTileDBQueries
 
         String selectSql = format("SELECT * FROM %s", arrayName);
         MaterializedResult selectResult = computeActual(selectSql);
-        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
-        for (MaterializedRow row : resultRows) {
-            System.out.println(row);
-        }
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER)
+                .row(4)
+                .build();
+        assertEquals(expected, selectResult);
         dropArray(arrayName);
     }
 
@@ -1571,7 +1571,7 @@ public class TestTileDBQueries
     {
         QueryRunner queryRunner = getQueryRunner();
         String createSql = format("CREATE TABLE %s(" +
-                "x bigint WITH (dimension=true) " +
+                "x integer WITH (dimension=true) " +
                 ") WITH (uri='%s')", arrayName, arrayName);
         queryRunner.execute(createSql);
     }
