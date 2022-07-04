@@ -529,12 +529,9 @@ public class TileDBRecordCursor
     private QueryCondition conditionForBound(Attribute attr, boolean isString, Object bound, tiledb_query_condition_op_t op) throws TileDBError
     {
         // handle the empty string cases
-        if (isString && bound != null && bound.toString().equals("")) {
-            if (attr.getNullable()) { //not necessary after https://github.com/TileDB-Inc/TileDB/pull/2507 fix. //TODO
-                return new QueryCondition(ctx, attr.getName(), "".getBytes(), attr.getType().javaClass(), TILEDB_EQ);
-            }
-            else {
-                return new QueryCondition(ctx, attr.getName(), " ".getBytes(), attr.getType().javaClass(), TILEDB_EQ);
+        if (isString && bound.toString().equals("")) {
+            if (attr.getNullable()) {
+                return new QueryCondition(ctx, attr.getName(), "".getBytes(), null, TILEDB_EQ);
             }
         }
         if (isString) {
