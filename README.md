@@ -37,7 +37,7 @@ Tests can be skipped by adding `-DskipTests`
 
 ### Installation on a Trino instance
 
-First clone [Trino](https://github.com/TileDB-Inc/TileDB-Trino/releases/latest)
+First clone Trino
 ```
 git clone https://github.com/trinodb/trino.git
 ```
@@ -50,17 +50,17 @@ Create a TileDB directory
 ```
 mkdir trino/core/trino-server/target/trino-server-***-SNAPSHOT/plugin/tiledb
 ```
-Copy the TileDB-Trino jars to the TileDB directory
+Build and copy the TileDB-Trino jars to the TileDB directory
 ```
 cp TileDB-Trino/target/*.jar trino/core/trino-server/target/trino-server-***-SNAPSHOT/plugin/tiledb
 ```
-Create an "etc" folder which includes the tiledb.properties file and move it to:
+Create two nested directories "etc/catalog" which include the tiledb.properties file and move them to:
 ```
 trino/core/trino-server/target/trino-server-***-SNAPSHOT/
 ```
 Launch the Trino Server
 ```
-trino/core/trino-server/target/trino-server-364-SNAPSHOT/bin/launcher run
+trino/core/trino-server/target/trino-server-***-SNAPSHOT/bin/launcher run
 ```
 Launch the Trino-CLI with the TileDB plugin
 ```
