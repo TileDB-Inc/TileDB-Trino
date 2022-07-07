@@ -276,11 +276,24 @@ public class TileDBRecordCursor
         for (int i = 0; i < columnHandles.size(); i++) {
             columnIndexLookup.put(columnHandles.get(i).getColumnName(), i);
         }
+
+        try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
+            // If empty we add all dimensions and attributes. This is needed for count queries with a where clause.
+            if (columnIndexLookup.isEmpty()) {
+                for (int i = 0; i < arraySchema.getAttributeNum(); i++) {
+                    columnIndexLookup.put(arraySchema.getAttribute(i).getName(), 0);
+                }
+                for (int i = 0; i < domain.getNDim(); i++) {
+                    columnIndexLookup.put(domain.getDimension(i).getName(), 0);
+                }
+            }
+        }
+
         HashMap<String, Pair<Long, Long>> estimations = new HashMap<>();
         String name;
 
         // Build attribute array to avoid making calls to ArraySchema.getAttribute(string)
-        //Also make result size estimations to allocate the buffers.
+        // Also make result size estimations to allocate the buffers.
         for (int i = 0; i < arraySchema.getAttributeNum(); i++) {
             try (Attribute attribute = arraySchema.getAttribute(i)) {
                 name = attribute.getName();
@@ -310,12 +323,6 @@ public class TileDBRecordCursor
         }
 
         try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
-            // If we're empty let's at least select the first dimension
-            // this is needed for count queries
-            if (columnIndexLookup.isEmpty()) {
-                columnIndexLookup.put(domain.getDimension(0).getName(), 0);
-            }
-
             for (int i = 0; i < domain.getNDim(); i++) {
                 try (Dimension dim = domain.getDimension(i)) {
                     name = dim.getName();
@@ -468,7 +475,7 @@ public class TileDBRecordCursor
             HashMap<String, Attribute> attributes = arraySchema.getAttributes();
             Iterator it = attributes.entrySet().iterator();
             QueryCondition finalQueryCondition = null;
-            while (it.hasNext()) {
+            while (it.hasNext()) { ////TODO the code below will never be executed since TileDB Query Conditions are disabled for the moment.
                 Map.Entry pair = (Map.Entry) it.next();
                 Attribute att = (Attribute) pair.getValue();
                 Pair attBounds = getBoundsForAttribute(split, att);
@@ -481,6 +488,7 @@ public class TileDBRecordCursor
                         }
                         else {
                             finalQueryCondition = finalQueryCondition.combine(cond, TILEDB_AND);
+                            cond.close();
                         }
                     }
                     else if (attBounds.getSecond() == null) {
@@ -490,18 +498,28 @@ public class TileDBRecordCursor
                         }
                         else {
                             finalQueryCondition = finalQueryCondition.combine(cond, TILEDB_AND);
+                            cond.close();
                         }
                     }
                     else {
-                        QueryCondition cond1 = conditionForBound(att, isString, attBounds.getFirst(), TILEDB_GE);
-                        QueryCondition cond2 = conditionForBound(att, isString, attBounds.getSecond(), TILEDB_LE);
-                        QueryCondition cond3 = cond1.combine(cond2, TILEDB_AND);
-
-                        if (finalQueryCondition == null) {
-                            finalQueryCondition = cond3;
+                        QueryCondition result;
+                        if (attBounds.getFirst().equals(attBounds.getSecond())) {
+                            result = conditionForBound(att, isString, attBounds.getFirst(), TILEDB_EQ);
                         }
                         else {
-                            finalQueryCondition = finalQueryCondition.combine(cond3, TILEDB_AND);
+                            QueryCondition cond1 = conditionForBound(att, isString, attBounds.getFirst(), TILEDB_GE);
+                            QueryCondition cond2 = conditionForBound(att, isString, attBounds.getSecond(), TILEDB_LE);
+                            result = cond1.combine(cond2, TILEDB_AND);
+                            cond1.close();
+                            cond2.close();
+                        }
+
+                        if (finalQueryCondition == null) {
+                            finalQueryCondition = result;
+                        }
+                        else {
+                            finalQueryCondition = finalQueryCondition.combine(result, TILEDB_AND);
+                            result.close();
                         }
                     }
                 }
@@ -509,6 +527,7 @@ public class TileDBRecordCursor
             }
             if (finalQueryCondition != null) {
                 query.setCondition(finalQueryCondition);
+                finalQueryCondition.close();
             }
         }
         catch (Exception ex) {
@@ -528,17 +547,8 @@ public class TileDBRecordCursor
      */
     private QueryCondition conditionForBound(Attribute attr, boolean isString, Object bound, tiledb_query_condition_op_t op) throws TileDBError
     {
-        // handle the empty string cases
-        if (isString && bound != null && bound.toString().equals("")) {
-            if (attr.getNullable()) { //not necessary after https://github.com/TileDB-Inc/TileDB/pull/2507 fix. //TODO
-                return new QueryCondition(ctx, attr.getName(), "".getBytes(), attr.getType().javaClass(), TILEDB_EQ);
-            }
-            else {
-                return new QueryCondition(ctx, attr.getName(), " ".getBytes(), attr.getType().javaClass(), TILEDB_EQ);
-            }
-        }
         if (isString) {
-            bound = bound.toString().getBytes();
+            bound = bound.toString();
         }
         return new QueryCondition(ctx, attr.getName(), bound, attr.getType().javaClass(), op);
     }
@@ -551,6 +561,7 @@ public class TileDBRecordCursor
         if (emptyQueryAttributes.contains(attribute.toString())) {
             return new Pair<>("", "");
         }
+
         String name = attribute.getName();
         Pair<Long, Long> timer = startTimer();
         TupleDomain<ColumnHandle> tupleDomain = split.getTupleDomain();
