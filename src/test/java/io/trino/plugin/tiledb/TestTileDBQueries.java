@@ -288,6 +288,25 @@ public class TestTileDBQueries
     }
 
     @Test
+    public void testEmptyString()
+    {
+        String arrayName = "test_empty_string";
+        dropArray(arrayName);
+        create1D2AVector(arrayName);
+
+        String insertSql = format("INSERT INTO %s (x, a1, a2, a3) VALUES " +
+                "(0, 10, '', 300.0), (3, 13, 'b', 200.0), (5, 15, 'c', 1000.0), (6, 16, 'd', 1.0), (7, 124, 'e', 20.0)", arrayName);
+        getQueryRunner().execute(insertSql);
+
+        String selectSql1 = format("SELECT * FROM %s WHERE a2 = '' ", arrayName);
+        MaterializedResult selectResult1 = computeActual(selectSql1);
+        System.out.println(selectResult1);
+        assertEquals(selectResult1, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
+                .row((long) 0, 10, "\u0000", 300.0f)
+                .build());
+    }
+
+    @Test
     public void testCreate1DVectorSmallInt()
     {
         // Smallint
