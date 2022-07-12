@@ -426,9 +426,6 @@ public class TileDBPageSink
         // Only varchar and varbinary are supported for variable length attributes, so we only check these for additional size requirements
         if (type instanceof VarcharType || type instanceof CharType) {
             size = type.getSlice(block, position).toStringUtf8().length();
-            if (size == 0) {
-                size++; // for cases where the empty string is requested
-            }
         }
         else if (VARBINARY.equals(type)) {
             size = type.getSlice(block, position).getBytes().length;

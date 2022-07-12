@@ -151,26 +151,19 @@ public class TestTileDBQueries
         dropArray(arrayName);
         create1D2AVector(arrayName);
 
-        MaterializedResult desc = computeActual(format("DESC %s", arrayName)).toTestTypes();
-        assertEquals(desc,
-                MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
-                        .row("x", "bigint", "", "Dimension")
-                        .row("a1", "integer", "", "Attribute")
-                        .row("a2", "varchar", "", "Attribute")
-                        .row("a3", "real", "", "Attribute")
-                        .build());
         String insertSql = format("INSERT INTO %s (x, a1, a2, a3) VALUES " +
-                "(0, 10, 'a', 300.0), (3, 13, 'b', 200.0), (5, 15, 'c', 1000.0), (6, 16, 'd', 1.0), (7, 124, 'e', 20.0)", arrayName);
+                "(0, 10, '', 300.0), (3, 13, 'b', 200.0), (5, 15, 'c', 1000.0), (6, 16, 'd', 1.0), (7, 124, 'e', 20.0)", arrayName);
         getQueryRunner().execute(insertSql);
 
         String selectSql1 = format("SELECT * FROM %s WHERE a1 > 100 ORDER by x ASC", arrayName); // pushed down
         String selectSql2 = format("SELECT * FROM %s WHERE a2 = 'c' ORDER by x ASC", arrayName); // pushed down
         String selectSql3 = format("SELECT * FROM %s WHERE a2 >= 'b' and a2 < 'e' ORDER by x ASC", arrayName); // pushed down
         String selectSql4 = format("SELECT * FROM %s WHERE a1 > 15 and a1 < 100 ORDER by x ASC", arrayName); // pushed down
-        String selectSql5 = format("SELECT * FROM %s WHERE a1 > 15 or a1 < 12 ORDER by x ASC", arrayName); // not pushed down
+        String selectSql5 = format("SELECT * FROM %s WHERE a1 = 15 OR a2 = 'b' ORDER by x ASC", arrayName); // not pushed down
         String selectSql6 = format("SELECT * FROM %s WHERE a3 < 300 ORDER by x ASC", arrayName); // pushed down
-        String selectSql7 = format("SELECT * FROM %s WHERE a3 < 30 or a3 > 500 ORDER by x ASC", arrayName); // not pushed down
-        String selectSql8 = format("SELECT * FROM %s WHERE a1 > 15 AND a3 > 3 ORDER by x ASC", arrayName); // pushed down
+        String selectSql7 = format("SELECT * FROM %s WHERE a1 > 15 AND a3 > 3 ORDER by x ASC", arrayName); // pushed down
+        String selectSql8 = format("SELECT * FROM %s WHERE a2 = ''", arrayName);
+        String selectSql9 = format("SELECT count(*) FROM %s WHERE a2 = ''", arrayName);
         MaterializedResult selectResult1 = computeActual(selectSql1);
         MaterializedResult selectResult2 = computeActual(selectSql2);
         MaterializedResult selectResult3 = computeActual(selectSql3);
@@ -179,6 +172,7 @@ public class TestTileDBQueries
         MaterializedResult selectResult6 = computeActual(selectSql6);
         MaterializedResult selectResult7 = computeActual(selectSql7);
         MaterializedResult selectResult8 = computeActual(selectSql8);
+        MaterializedResult selectResult9 = computeActual(selectSql9);
 
         assertEquals(selectResult1, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
                 .row((long) 7, 124, "e", 20.0f)
@@ -199,9 +193,8 @@ public class TestTileDBQueries
                 .build());
 
         assertEquals(selectResult5, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
-                .row((long) 0, 10, "a", 300.0f)
-                .row((long) 6, 16, "d", 1.0f)
-                .row((long) 7, 124, "e", 20.0f)
+                .row((long) 3, 13, "b", 200.0f)
+                .row((long) 5, 15, "c", 1000.0f)
                 .build());
 
         assertEquals(selectResult6, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
@@ -211,13 +204,15 @@ public class TestTileDBQueries
                 .build());
 
         assertEquals(selectResult7, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
-                .row((long) 5, 15, "c", 1000.0f)
-                .row((long) 6, 16, "d", 1.0f)
                 .row((long) 7, 124, "e", 20.0f)
                 .build());
 
         assertEquals(selectResult8, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
-                .row((long) 7, 124, "e", 20.0f)
+                .row((long) 0, 10, "", 300.0f)
+                .build());
+
+        assertEquals(selectResult9, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT)
+                .row((long) 1)
                 .build());
 
         dropArray(arrayName);
@@ -285,25 +280,6 @@ public class TestTileDBQueries
                 .build());
 
         dropArray(arrayName);
-    }
-
-    @Test
-    public void testEmptyString()
-    {
-        String arrayName = "test_empty_string";
-        dropArray(arrayName);
-        create1D2AVector(arrayName);
-
-        String insertSql = format("INSERT INTO %s (x, a1, a2, a3) VALUES " +
-                "(0, 10, '', 300.0), (3, 13, 'b', 200.0), (5, 15, 'c', 1000.0), (6, 16, 'd', 1.0), (7, 124, 'e', 20.0)", arrayName);
-        getQueryRunner().execute(insertSql);
-
-        String selectSql1 = format("SELECT * FROM %s WHERE a2 = '' ", arrayName);
-        MaterializedResult selectResult1 = computeActual(selectSql1);
-        System.out.println(selectResult1);
-        assertEquals(selectResult1, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), BIGINT, INTEGER, VARCHAR, REAL)
-                .row((long) 0, 10, "\u0000", 300.0f)
-                .build());
     }
 
     @Test
@@ -1322,26 +1298,18 @@ public class TestTileDBQueries
      * Reads a two-dimensional dense array with nullable attributes.
      */
     @Test
-    public void testRead2DVectorNullableDense()
+    public void test2DVectorNullableDense()
     {
-        String selectSql = format("SELECT * FROM %s", denseURI);
+        String selectSql = format("SELECT * FROM %s ORDER BY rows ASC", denseURI);
         MaterializedResult selectResult = computeActual(selectSql);
         List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
-        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), DOUBLE, INTEGER)
-                .row(1, 2, 3.0, 4)
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, INTEGER, REAL, INTEGER)
                 .row(1, 1, null, 1)
+                .row(1, 2, 3.0, 4)
                 .row(2, 1, 4.0, null)
                 .row(2, 2, null, 2)
                 .build();
-        //using string representation because of null values
-        List<MaterializedRow> expectedRows = expected.getMaterializedRows();
-        List<String> resultRowsToString = resultRows.stream()
-                .map(object -> Objects.toString(object, null))
-                .collect(Collectors.toList());
-        List<String> expectedRowsToString = expectedRows.stream()
-                .map(object -> Objects.toString(object, null))
-                .collect(Collectors.toList());
-        assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
+        assertEquals(expected.toString(), selectResult.toString());
     }
 
     /**
@@ -1415,30 +1383,19 @@ public class TestTileDBQueries
      * Reads a two-dimensional sparse array with nullable attributes.
      */
     @Test
-    public void testRead2DVectorNullableSparse()
+    public void test2DVectorNullableSparse()
     {
-        String selectSql = format("SELECT * FROM %s", sparseURI);
+        String selectSql = format("SELECT * FROM %s ORDER BY d1 ASC", sparseURI);
         MaterializedResult selectResult = computeActual(selectSql);
-        List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
-//        for (MaterializedRow row : resultRows) {
-//            System.out.println(row);
-//        }
-        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, VARCHAR)
+        MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, INTEGER, VARCHAR)
                 .row(1, null, "aa")
                 .row(2, null, "bb")
                 .row(3, null, "cc")
                 .row(4, 4, null)
                 .row(5, 5, null)
                 .build();
-        //using string representation because of null values
-        List<MaterializedRow> expectedRows = expected.getMaterializedRows();
-        List<String> resultRowsToString = resultRows.stream()
-                .map(object -> Objects.toString(object, null))
-                .collect(Collectors.toList());
-        List<String> expectedRowsToString = expectedRows.stream()
-                .map(object -> Objects.toString(object, null))
-                .collect(Collectors.toList());
-        assertTrue(expectedRowsToString.size() == resultRowsToString.size() && expectedRowsToString.containsAll(resultRowsToString) && resultRowsToString.containsAll(expectedRowsToString)); //presto returns rows in different every time.
+
+        assertEquals(expected.toString(), selectResult.toString());
     }
 
     /**

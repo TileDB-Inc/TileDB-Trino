@@ -475,7 +475,7 @@ public class TileDBRecordCursor
             HashMap<String, Attribute> attributes = arraySchema.getAttributes();
             Iterator it = attributes.entrySet().iterator();
             QueryCondition finalQueryCondition = null;
-            while (it.hasNext()) { ////TODO the code below will never be executed since TileDB Query Conditions are disabled for the moment.
+            while (it.hasNext()) { ////TODO the code below will never run since TileDB's Query Condition is disabled at the moment.
                 Map.Entry pair = (Map.Entry) it.next();
                 Attribute att = (Attribute) pair.getValue();
                 Pair attBounds = getBoundsForAttribute(split, att);
