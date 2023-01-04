@@ -919,7 +919,7 @@ public class TileDBRecordCursor
     }
 
     @Override
-    public long getSystemMemoryUsage()
+    public long getMemoryUsage()
     {
         return calculateNativeArrayByteSizes();
     }

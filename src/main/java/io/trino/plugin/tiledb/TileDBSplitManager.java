@@ -13,7 +13,9 @@
  */
 package io.trino.plugin.tiledb;
 
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import io.airlift.log.Logger;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.EncryptionType;
@@ -26,13 +28,17 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorSplitSource;
-import io.trino.spi.connector.ConnectorTableLayoutHandle;
+import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.connector.Constraint;
+import io.trino.spi.connector.DynamicFilter;
 import io.trino.spi.connector.FixedSplitSource;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.Range;
 import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.predicate.ValueSet;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.VarcharType;
 import org.apache.commons.beanutils.ConvertUtils;
 
 import javax.inject.Inject;
@@ -41,12 +47,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.airlift.slice.Slices.utf8Slice;
+import static io.tiledb.java.api.QueryType.TILEDB_READ;
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_SPLIT_MANAGER_ERROR;
 import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
+import static io.trino.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
 import static io.trino.spi.predicate.Range.range;
 import static io.trino.spi.type.RealType.REAL;
+import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -58,8 +70,9 @@ public class TileDBSplitManager
     private static final Logger LOG = Logger.get(TileDBSplitManager.class);
     private final String connectorId;
     private final TileDBClient tileDBClient;
-    private TileDBTableLayoutHandle layoutHandle;
     private final NodeManager nodeManager;
+
+    private final TileDBMetadata tileDBMetadata;
 
     @Inject
     public TileDBSplitManager(TileDBConnectorId connectorId, TileDBClient tileDBClient, NodeManager nodeManager)
@@ -67,14 +80,13 @@ public class TileDBSplitManager
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.tileDBClient = requireNonNull(tileDBClient, "client is null");
+        this.tileDBMetadata = new TileDBMetadata(connectorId, tileDBClient);
     }
 
     @Override
-    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy)
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, ConnectorSplitManager.SplitSchedulingStrategy splitSchedulingStrategy, DynamicFilter dynamicFilter, Constraint constraint)
     {
-        this.layoutHandle = (TileDBTableLayoutHandle) layout;
-
-        TileDBTableHandle tableHandle = layoutHandle.getTable();
+        TileDBTableHandle tableHandle = (TileDBTableHandle) table;
 
         try {
             Array array;
@@ -90,7 +102,12 @@ public class TileDBSplitManager
             if (numSplits == -1) {
                 numSplits = nodeManager.getWorkerNodes().size();
             }
-            List<TupleDomain<ColumnHandle>> domainRangeSplits = splitTupleDomainOnRanges(layoutHandle.getTupleDomain(), numSplits, TileDBSessionProperties.getSplitOnlyPredicates(session), array.nonEmptyDomain());
+
+            Object[] domainAndColumnHandlesSize = getTupleDomain(session, tableHandle, constraint);
+            TupleDomain<ColumnHandle> tupleDomain = (TupleDomain<ColumnHandle>) domainAndColumnHandlesSize[0];
+            int dimensionCount = ((Set<ColumnHandle>) domainAndColumnHandlesSize[1]).size();
+
+            List<TupleDomain<ColumnHandle>> domainRangeSplits = splitTupleDomainOnRanges(tupleDomain, numSplits, TileDBSessionProperties.getSplitOnlyPredicates(session), array.nonEmptyDomain(), dimensionCount);
 
             List<TileDBSplit> splits = domainRangeSplits.stream().map(
                     tuple -> new TileDBSplit(
@@ -106,14 +123,98 @@ public class TileDBSplitManager
         }
     }
 
-        /**
+    /**
+     * Returns the tuple domain and the column handles
+     * @param session The connector session
+     * @param tableHandle The table handle
+     * @param constraint The constraint
+     * @return an Object[] array with a size of 2 to return both objects
+     */
+    private Object[] getTupleDomain(ConnectorSession session, TileDBTableHandle tableHandle, Constraint constraint)
+    {
+        Object[] result = new Object[2];
+
+        TupleDomain<ColumnHandle> effectivePredicate = constraint.getSummary();
+
+        Map<String, ColumnHandle> columns = tileDBMetadata.getColumnHandles(session, tableHandle);
+
+        Set<ColumnHandle> dimensionHandles = columns.values().stream()
+                .filter(e -> ((TileDBColumnHandle) e).getIsDimension())
+                .collect(Collectors.toSet());
+
+        // The only enforceable constraints are ones for dimension columns
+        Map<ColumnHandle, Domain> enforceableDimensionDomains = new HashMap<>(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.in(dimensionHandles)));
+
+        if (!getSplitOnlyPredicates(session)) {
+            try {
+                Array array;
+                String key = getEncryptionKey(session);
+                if (key == null) {
+                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ);
+                }
+                else {
+                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+                }
+
+                HashMap<String, Pair> nonEmptyDomain = array.nonEmptyDomain();
+                // Find any dimension which do not have predicates and add one for the entire domain.
+                // This is required so we can later split on the predicates
+                for (ColumnHandle dimensionHandle : dimensionHandles) {
+                    if (!enforceableDimensionDomains.containsKey(dimensionHandle)) {
+                        TileDBColumnHandle columnHandle = ((TileDBColumnHandle) dimensionHandle);
+                        if (nonEmptyDomain.containsKey(columnHandle.getColumnName())) {
+                            Pair<Object, Object> domain = nonEmptyDomain.get(columnHandle.getColumnName());
+                            Object nonEmptyMin = domain.getFirst();
+                            Object nonEmptyMax = domain.getSecond();
+                            Type type = columnHandle.getColumnType();
+                            if (nonEmptyMin == null || nonEmptyMax == null || nonEmptyMin.equals("") || nonEmptyMax.equals("")) {
+                                continue;
+                            }
+
+                            Range range;
+                            if (REAL.equals(type)) {
+                                range = Range.range(type, ((Integer) floatToRawIntBits((Float) nonEmptyMin)).longValue(), true,
+                                        ((Integer) floatToRawIntBits((Float) nonEmptyMax)).longValue(), true);
+                            }
+                            else if (type instanceof VarcharType) {
+                                range = Range.range(type, utf8Slice(nonEmptyMin.toString()), true,
+                                        utf8Slice(nonEmptyMax.toString()), true);
+                            }
+                            else {
+                                range = Range.range(type,
+                                        ConvertUtils.convert(nonEmptyMin, type.getJavaType()), true,
+                                        ConvertUtils.convert(nonEmptyMax, type.getJavaType()), true);
+                            }
+
+                            enforceableDimensionDomains.put(
+                                    dimensionHandle,
+                                    Domain.create(ValueSet.ofRanges(range), false));
+                        }
+                    }
+                }
+                array.close();
+            }
+            catch (TileDBError tileDBError) {
+                throw new TrinoException(TILEDB_RECORD_SET_ERROR, tileDBError);
+            }
+        }
+
+        TupleDomain<ColumnHandle> enforceableTupleDomain = TupleDomain.withColumnDomains(enforceableDimensionDomains);
+        result[0] = enforceableTupleDomain;
+        result[1] = dimensionHandles;
+        return result;
+    }
+
+    /**
      * Split tuple domain if there are multiple ranges
+     *
      * @param tupleDomain
      * @param splitOnlyPredicates
      * @param nonEmptyDomains
-         * @return
+     * @param dimensionCount
+     * @return
      */
-    private List<TupleDomain<ColumnHandle>> splitTupleDomainOnRanges(TupleDomain<ColumnHandle> tupleDomain, int splits, boolean splitOnlyPredicates, HashMap<String, Pair> nonEmptyDomains)
+    private List<TupleDomain<ColumnHandle>> splitTupleDomainOnRanges(TupleDomain<ColumnHandle> tupleDomain, int splits, boolean splitOnlyPredicates, HashMap<String, Pair> nonEmptyDomains, int dimensionCount)
     {
         List<Pair<ColumnHandle, List<Domain>>> domainList = new ArrayList<>();
         // Loop through each column handle's domain to see if there are ranges to split
@@ -123,7 +224,6 @@ public class TileDBSplitManager
                 .mapToInt(i -> i.getValue().getValues().getRanges().getRangeCount())
                 .sum();
 
-        int dimensionCount = this.layoutHandle.getDimensionColumnHandles().size();
         if (splitOnlyPredicates) {
             dimensionCount = ((Long) tupleDomain.getDomains().get().entrySet().stream()
                     .filter(e -> ((TileDBColumnHandle) e.getKey()).getIsDimension()).count()).intValue();
@@ -171,7 +271,7 @@ public class TileDBSplitManager
         List<TupleDomain<ColumnHandle>> results = new ArrayList<>();
 
         // Create combination for all tuple domains
-        GenerateCombinationTupleDomains(domainList, intermediateResults, 0, new HashMap<>());
+        generateCombinationTupleDomains(domainList, intermediateResults, 0, new HashMap<>());
         for (Map<ColumnHandle, Domain> domain : intermediateResults) {
             results.add(TupleDomain.withColumnDomains(domain));
         }
@@ -186,7 +286,7 @@ public class TileDBSplitManager
      * @param depth
      * @param current
      */
-    private void GenerateCombinationTupleDomains(List<Pair<ColumnHandle, List<Domain>>> lists, List<Map<ColumnHandle, Domain>> result, int depth, Map<ColumnHandle, Domain> current)
+    private void generateCombinationTupleDomains(List<Pair<ColumnHandle, List<Domain>>> lists, List<Map<ColumnHandle, Domain>> result, int depth, Map<ColumnHandle, Domain> current)
     {
         if (depth == lists.size()) {
             result.add(current);
@@ -200,7 +300,7 @@ public class TileDBSplitManager
             // Copy the current tuple mapping since java uses references to maps
             Map<ColumnHandle, Domain> currentCopy = current.entrySet().stream()
                     .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue()));
-            GenerateCombinationTupleDomains(lists, result, depth + 1, currentCopy);
+            generateCombinationTupleDomains(lists, result, depth + 1, currentCopy);
         }
     }
 

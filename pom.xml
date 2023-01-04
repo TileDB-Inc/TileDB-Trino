@@ -6,7 +6,7 @@
     <parent>
         <artifactId>trino-root</artifactId>
         <groupId>io.trino</groupId>
-        <version>357</version>
+        <version>369</version>
     </parent>
 
     <artifactId>trino-tiledb</artifactId>
@@ -54,7 +54,7 @@
         <dependency>
             <groupId>com.github.oshi</groupId>
             <artifactId>oshi-core</artifactId>
-            <version>3.10.0</version>
+            <version>5.8.5</version>
         </dependency>
 
         <dependency>
@@ -145,7 +145,7 @@
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-testing</artifactId>
-            <version>357</version>
+            <version>369</version>
             <scope>test</scope>
         </dependency>
 

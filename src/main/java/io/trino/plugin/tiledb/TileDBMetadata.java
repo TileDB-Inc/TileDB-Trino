@@ -13,11 +13,9 @@
  */
 package io.trino.plugin.tiledb;
 
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.tiledb.java.api.Array;
@@ -40,23 +38,13 @@ import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
-import io.trino.spi.connector.ConnectorTableLayout;
-import io.trino.spi.connector.ConnectorTableLayoutHandle;
-import io.trino.spi.connector.ConnectorTableLayoutResult;
 import io.trino.spi.connector.ConnectorTableMetadata;
-import io.trino.spi.connector.Constraint;
-import io.trino.spi.connector.LocalProperty;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SchemaTablePrefix;
 import io.trino.spi.connector.TableNotFoundException;
-import io.trino.spi.predicate.Domain;
-import io.trino.spi.predicate.Range;
-import io.trino.spi.predicate.TupleDomain;
-import io.trino.spi.predicate.ValueSet;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.VarcharType;
-import org.apache.commons.beanutils.ConvertUtils;
 
 import javax.inject.Inject;
 
@@ -65,22 +53,17 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.airlift.slice.Slices.utf8Slice;
 import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
 import static io.tiledb.java.api.Constants.TILEDB_VAR_NUM;
-import static io.tiledb.java.api.QueryType.TILEDB_READ;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getDimension;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getExtent;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getFilterList;
@@ -88,13 +71,9 @@ import static io.trino.plugin.tiledb.TileDBColumnProperties.getLowerBound;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getNullable;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getUpperBound;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
-import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_RECORD_SET_ERROR;
 import static io.trino.plugin.tiledb.TileDBModule.tileDBTypeFromTrinoType;
 import static io.trino.plugin.tiledb.TileDBSessionProperties.getEncryptionKey;
-import static io.trino.plugin.tiledb.TileDBSessionProperties.getSplitOnlyPredicates;
 import static io.trino.plugin.tiledb.TileDBTableProperties.getEncryptionKey;
-import static io.trino.spi.type.RealType.REAL;
-import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -151,140 +130,6 @@ public class TileDBMetadata
             return null;
         }
         return new TileDBTableHandle(connectorId, tableName.getSchemaName(), tableName.getTableName(), table.getURI().toString());
-    }
-
-    @Override
-    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table, Constraint constraint, Optional<Set<ColumnHandle>> desiredColumns)
-    {
-        TileDBTableHandle tableHandle = (TileDBTableHandle) table;
-
-        // Set the dimensions as the partition columns
-        Optional<Set<ColumnHandle>> partitioningColumns = Optional.empty();
-        ImmutableList.Builder<LocalProperty<ColumnHandle>> localProperties = ImmutableList.builder();
-
-        Map<String, ColumnHandle> columns = getColumnHandles(session, tableHandle);
-        boolean hasPredicate = constraint.predicate().isPresent();
-
-        // Predicates are fetched as summary of constraints
-        TupleDomain<ColumnHandle> effectivePredicate = constraint.getSummary();
-//        Set<ColumnHandle> columnHandles = new HashSet<>(); //TODO check if possible in the future
-//        for (ColumnHandle e : columns.values()) {
-//            if (hasPredicate) {
-//                columnsWithPredicates.add(e);
-//            }
-//            //columns that are not included in the columnHandles are filtered by presto, not tileDB. Strings and queries with 'OR' are not pushed down for now.
-//            if ((((effectivePredicate.getDomains().get().get(e) != null) &&
-//                    (effectivePredicate.getDomains().get().get(e).getValues().getRanges().getOrderedRanges().size() > 1)))) { //having more than one range effectively means it is an OR condition, which is not yet supported by the core library.
-//                LOG.info("Column %s has an OR condition which is not yet supported by TileDB's native QueryCondition. The filtering will happen by Trino.", ((TileDBColumnHandle) e).getColumnName());
-//            }
-//            else if (columnsWithPredicates.contains(e)) { //Predicates are not supported by the QueryCondition, thus we need to leave this to Presto.
-//                LOG.info("Column %s uses a Predicate which is not yet supported by TileDB's native QueryCondition. The filtering will happen by Trino.", ((TileDBColumnHandle) e).getColumnName());
-//            }
-//            else {
-//                columnHandles.add(e);
-//            }
-//        }
-
-        Set<ColumnHandle> dimensionHandles = columns.values().stream()
-                .filter(e -> ((TileDBColumnHandle) e).getIsDimension())
-                .collect(Collectors.toSet());
-
-        List<ColumnHandle> columnsInLayout;
-        if (desiredColumns.isPresent()) {
-            // Add all dimensions since dimensions will always be returned by tiledb
-            Set<ColumnHandle> desiredColumnsWithDimension = new HashSet<>(desiredColumns.get());
-            desiredColumnsWithDimension.addAll(dimensionHandles);
-//            desiredColumnsWithDimension.addAll(columnHandles);
-            columnsInLayout = new ArrayList<>(desiredColumnsWithDimension);
-        }
-        else {
-            columnsInLayout = new ArrayList<>(columns.values());
-        }
-
-        // The only enforceable constraints are ones for dimension columns
-        Map<ColumnHandle, Domain> enforceableDimensionDomains = new HashMap<>(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.in(dimensionHandles)));
-
-        if (!getSplitOnlyPredicates(session)) {
-            try {
-                Array array;
-                String key = getEncryptionKey(session);
-                if (key == null) {
-                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ);
-                }
-                else {
-                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
-                }
-
-                HashMap<String, Pair> nonEmptyDomain = array.nonEmptyDomain();
-                // Find any dimension which do not have predicates and add one for the entire domain.
-                // This is required so we can later split on the predicates
-                for (ColumnHandle dimensionHandle : dimensionHandles) {
-                    if (!enforceableDimensionDomains.containsKey(dimensionHandle)) {
-                        TileDBColumnHandle columnHandle = ((TileDBColumnHandle) dimensionHandle);
-                        if (nonEmptyDomain.containsKey(columnHandle.getColumnName())) {
-                            Pair<Object, Object> domain = nonEmptyDomain.get(columnHandle.getColumnName());
-                            Object nonEmptyMin = domain.getFirst();
-                            Object nonEmptyMax = domain.getSecond();
-                            Type type = columnHandle.getColumnType();
-                            if (nonEmptyMin == null || nonEmptyMax == null || nonEmptyMin.equals("") || nonEmptyMax.equals("")) {
-                                continue;
-                            }
-
-                            Range range;
-                            if (REAL.equals(type)) {
-                                range = Range.range(type, ((Integer) floatToRawIntBits((Float) nonEmptyMin)).longValue(), true,
-                                        ((Integer) floatToRawIntBits((Float) nonEmptyMax)).longValue(), true);
-                            }
-                            else if (type instanceof VarcharType) {
-                                range = Range.range(type, utf8Slice(nonEmptyMin.toString()), true,
-                                        utf8Slice(nonEmptyMax.toString()), true);
-                            }
-                            else {
-                                range = Range.range(type,
-                                        ConvertUtils.convert(nonEmptyMin, type.getJavaType()), true,
-                                        ConvertUtils.convert(nonEmptyMax, type.getJavaType()), true);
-                            }
-
-                            enforceableDimensionDomains.put(
-                                    dimensionHandle,
-                                    Domain.create(ValueSet.ofRanges(range), false));
-                        }
-                    }
-                }
-                array.close();
-            }
-            catch (TileDBError tileDBError) {
-                throw new TrinoException(TILEDB_RECORD_SET_ERROR, tileDBError);
-            }
-        }
-
-        TupleDomain<ColumnHandle> enforceableTupleDomain = TupleDomain.withColumnDomains(enforceableDimensionDomains);
-        TupleDomain<ColumnHandle> remainingTupleDomain;
-
-        // The remaining tuples non-enforced by TileDB are attributes
-        remainingTupleDomain = TupleDomain.withColumnDomains(Maps.filterKeys(effectivePredicate.getDomains().get(), Predicates.not(Predicates.in(dimensionHandles))));
-
-        ConnectorTableLayout layout = new ConnectorTableLayout(
-                new TileDBTableLayoutHandle(tableHandle, enforceableTupleDomain, dimensionHandles),
-                Optional.of(columnsInLayout),
-                TupleDomain.all(),
-                Optional.empty(),
-                partitioningColumns,
-                Optional.empty(),
-                localProperties.build());
-
-        return ImmutableList.of(new ConnectorTableLayoutResult(layout, remainingTupleDomain));
-    }
-
-    @Override
-    public ConnectorTableLayout getTableLayout(ConnectorSession session, ConnectorTableLayoutHandle handle)
-    {
-        TileDBTableLayoutHandle layout = (TileDBTableLayoutHandle) handle;
-
-        // tables in this connector have a single layout
-        return getTableLayouts(session, layout.getTable(), Constraint.alwaysTrue(), Optional.empty())
-                .get(0)
-                .getTableLayout();
     }
 
     @Override
@@ -671,11 +516,5 @@ public class TileDBMetadata
         catch (URISyntaxException e) {
             throw new TrinoException(TILEDB_CREATE_TABLE_ERROR, e);
         }
-    }
-
-    @Override
-    public boolean usesLegacyTableLayouts()
-    {
-        return true;
     }
 }
