@@ -30,6 +30,7 @@ import io.trino.spi.type.VarcharType;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -73,7 +74,15 @@ public class TileDBTable
         // Add dimensions as a column
         for (Dimension dimension : domain.getDimensions()) {
             Type type = prestoTypeFromTileDBType(dimension.getType());
-            columnsMetadata.add(new ColumnMetadata(dimension.getName(), type, "Dimension", null, false));
+            ColumnMetadata columnMetadata = ColumnMetadata.builder()
+                    .setName(dimension.getName())
+                    .setType(type)
+                    .setExtraInfo(Optional.empty())
+                    .setComment(Optional.of("Dimension"))
+                    .setHidden(false)
+                    .build();
+
+            columnsMetadata.add(columnMetadata);
             columns.add(new TileDBColumn(dimension.getName(), type, dimension.getType(), dimension.isVar(), true, false));
             dimension.close();
         }
@@ -84,7 +93,14 @@ public class TileDBTable
             if (attribute.getType() == Datatype.TILEDB_CHAR && !attribute.isVar()) {
                 type = VarcharType.createVarcharType(toIntExact(attribute.getCellValNum()));
             }
-            columnsMetadata.add(new ColumnMetadata(attribute.getName(), type, "Attribute", null, false));
+            ColumnMetadata columnMetadata = ColumnMetadata.builder()
+                    .setName(attribute.getName())
+                    .setType(type)
+                    .setExtraInfo(Optional.empty())
+                    .setComment(Optional.of("Attribute"))
+                    .setHidden(false)
+                    .build();
+            columnsMetadata.add(columnMetadata);
             columns.add(new TileDBColumn(attribute.getName(), type, attribute.getType(), attribute.isVar(), false, attribute.getNullable()));
             attribute.close();
         }
