@@ -17,41 +17,29 @@ jobs:
         os: [ ubuntu-latest, macos-11 ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          check-latest: true
 
       - run: |
-          export JAVA_HOME=$JAVA_HOME_11_X64
           mvn checkstyle:checkstyle
         shell: bash
         name: checkStyle
 
       - run: |
-          export JAVA_HOME=$JAVA_HOME_11_X64
-          mvn clean package -DskipTests
+          mvn clean package -e -DskipTests
         shell: bash
         name: checkFormat
 
       - run: |
-          export JAVA_HOME=$JAVA_HOME_11_X64
           mvn test
         shell: bash
         name: test
-
-      - run: |
-          set -e pipefail
-          # Display log files if the build failed
-          echo "Dumping log files for failed build"
-          echo "----------------------------------"
-          for f in $(find $BUILD_REPOSITORY_LOCALPATH -name *.dumpstream);
-            do echo "------"
-               echo $f
-               echo "======"
-               cat $f
-            done;
-        shell: bash
-        name: error_print
-        if: ${{ failure() }}
-
 
   Release:
     if: startsWith(github.ref, 'refs/tags/')
