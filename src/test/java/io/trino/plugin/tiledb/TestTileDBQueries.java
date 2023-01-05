@@ -30,13 +30,10 @@ import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.Query;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
-import io.trino.spi.TrinoException;
 import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
 import io.trino.testing.QueryRunner;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -58,7 +55,6 @@ import static io.tiledb.java.api.ArrayType.TILEDB_SPARSE;
 import static io.tiledb.java.api.Layout.TILEDB_GLOBAL_ORDER;
 import static io.tiledb.java.api.Layout.TILEDB_ROW_MAJOR;
 import static io.tiledb.java.api.QueryType.TILEDB_WRITE;
-import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.trino.plugin.tiledb.TileDBQueryRunner.createTileDBQueryRunner;
 import static io.trino.spi.type.BigintType.BIGINT;
 import static io.trino.spi.type.DateType.DATE;
@@ -78,53 +74,13 @@ import static org.testng.Assert.fail;
 public class TestTileDBQueries
         extends AbstractTestQueryFramework
 {
-    private Context ctx;
-    private String denseURI;
-    private String sparseURI;
-
-    @BeforeClass
-    public void setup() throws Exception
-    {
-        denseURI = "dense_array";
-        sparseURI = "sparse_array";
-        if (Files.exists(Paths.get(denseURI))) {
-            TileDBObject.remove(ctx, denseURI);
-        }
-        denseArrayNullableCreate();
-        denseArrayNullableWrite();
-        if (Files.exists(Paths.get(sparseURI))) {
-            TileDBObject.remove(ctx, sparseURI);
-        }
-        sparseArrayNullableCreate();
-        sparseArrayNullableWrite();
-    }
-
-    public TestTileDBQueries()
-    {
-        super();
-        try {
-            ctx = new Context();
-        }
-        catch (TileDBError tileDBError) {
-            throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
-        }
-    }
+    private final String denseURI = "dense_array";
+    private final String sparseURI = "sparse_array";
 
     @Override
     protected QueryRunner createQueryRunner() throws Exception
     {
         return createTileDBQueryRunner();
-    }
-
-    @AfterClass(alwaysRun = true)
-    public final void destroy() throws TileDBError
-    {
-        if (Files.exists(Paths.get(denseURI))) {
-            TileDBObject.remove(ctx, denseURI);
-        }
-        if (Files.exists(Paths.get(sparseURI))) {
-            TileDBObject.remove(ctx, sparseURI);
-        }
     }
 
     @Test
@@ -1164,64 +1120,6 @@ public class TestTileDBQueries
      */
 
     /**
-     * Dense array with nullable and fixed size attributes.
-     *
-     * @throws Exception
-     */
-    private void denseArrayNullableCreate() throws Exception
-    {
-        Dimension<Integer> rows =
-                new Dimension<>(ctx, "rows", Integer.class, new Pair<Integer, Integer>(1, 2), 2);
-        Dimension<Integer> cols =
-                new Dimension<>(ctx, "cols", Integer.class, new Pair<Integer, Integer>(1, 2), 2);
-
-        // Create and set getDomain
-        Domain domain = new Domain(ctx);
-        domain.addDimension(rows);
-        domain.addDimension(cols);
-
-        Attribute a1 = new Attribute(ctx, "a1", Float.class);
-        Attribute a2 = new Attribute(ctx, "a2", Integer.class);
-        a2.setCellValNum(1);
-
-        a1.setNullable(true);
-        a2.setNullable(true);
-
-        ArraySchema schema = new ArraySchema(ctx, TILEDB_DENSE);
-        schema.setTileOrder(TILEDB_ROW_MAJOR);
-        schema.setCellOrder(TILEDB_ROW_MAJOR);
-        schema.setDomain(domain);
-        schema.addAttribute(a1);
-        schema.addAttribute(a2);
-
-        Array.create(denseURI, schema);
-    }
-
-    /**
-     * Populating the dense array with nullable attributes.
-     * @throws Exception
-     */
-    private void denseArrayNullableWrite() throws Exception
-    {
-        // Prepare cell buffers
-        NativeArray a1 = new NativeArray(ctx, new float[] {2.0f, 3.0f, 4.0f, 1.0f}, Float.class);
-        NativeArray a2 = new NativeArray(ctx, new int[] {1, 4, 2, 2}, Integer.class);
-
-        // Create query
-        try (Array array = new Array(ctx, denseURI, TILEDB_WRITE); Query query = new Query(array)) {
-            query.setLayout(TILEDB_ROW_MAJOR);
-            NativeArray a1Bytemap = new NativeArray(ctx, new short[] {0, 1, 1, 0}, Datatype.TILEDB_UINT8);
-            NativeArray a2Bytemap = new NativeArray(ctx, new short[] {1, 1, 0, 1}, Datatype.TILEDB_UINT8);
-
-            query.setBufferNullable("a1", a1, a1Bytemap);
-            query.setBufferNullable("a2", a2, a2Bytemap);
-
-            // Submit query
-            query.submit();
-        }
-    }
-
-    /**
      * Creates an one-dimensional array to test dimension filtering.
      */
     @Test
@@ -1298,8 +1196,52 @@ public class TestTileDBQueries
      * Reads a two-dimensional dense array with nullable attributes.
      */
     @Test
-    public void test2DVectorNullableDense()
+    public void test2DVectorNullableDense() throws Exception
     {
+        Context ctx = new Context();
+        Dimension<Integer> rows =
+                new Dimension<>(ctx, "rows", Integer.class, new Pair<Integer, Integer>(1, 2), 2);
+        Dimension<Integer> cols =
+                new Dimension<>(ctx, "cols", Integer.class, new Pair<Integer, Integer>(1, 2), 2);
+
+        // Create and set getDomain
+        Domain domain = new Domain(ctx);
+        domain.addDimension(rows);
+        domain.addDimension(cols);
+
+        Attribute a1 = new Attribute(ctx, "a1", Float.class);
+        Attribute a2 = new Attribute(ctx, "a2", Integer.class);
+        a2.setCellValNum(1);
+
+        a1.setNullable(true);
+        a2.setNullable(true);
+
+        ArraySchema schema = new ArraySchema(ctx, TILEDB_DENSE);
+        schema.setTileOrder(TILEDB_ROW_MAJOR);
+        schema.setCellOrder(TILEDB_ROW_MAJOR);
+        schema.setDomain(domain);
+        schema.addAttribute(a1);
+        schema.addAttribute(a2);
+
+        Array.create(denseURI, schema);
+
+        // Prepare cell buffers
+        NativeArray na1 = new NativeArray(ctx, new float[] {2.0f, 3.0f, 4.0f, 1.0f}, Float.class);
+        NativeArray na2 = new NativeArray(ctx, new int[] {1, 4, 2, 2}, Integer.class);
+
+        // Create query
+        try (Array array = new Array(ctx, denseURI, TILEDB_WRITE); Query query = new Query(array)) {
+            query.setLayout(TILEDB_ROW_MAJOR);
+            NativeArray a1Bytemap = new NativeArray(ctx, new short[] {0, 1, 1, 0}, Datatype.TILEDB_UINT8);
+            NativeArray a2Bytemap = new NativeArray(ctx, new short[] {1, 1, 0, 1}, Datatype.TILEDB_UINT8);
+
+            query.setBufferNullable("a1", na1, a1Bytemap);
+            query.setBufferNullable("a2", na2, a2Bytemap);
+
+            // Submit query
+            query.submit();
+        }
+
         String selectSql = format("SELECT * FROM %s ORDER BY rows ASC", denseURI);
         MaterializedResult selectResult = computeActual(selectSql);
         List<MaterializedRow> resultRows = selectResult.getMaterializedRows();
@@ -1310,15 +1252,20 @@ public class TestTileDBQueries
                 .row(2, 2, null, 2)
                 .build();
         assertEquals(expected.toString(), selectResult.toString());
+
+        if (Files.exists(Paths.get(denseURI))) {
+            TileDBObject.remove(ctx, denseURI);
+        }
+        ctx.close();
     }
 
     /**
-     * Sparse array with nullable and variable sized attributes.
-     *
-     * @throws TileDBError
+     * Reads a two-dimensional sparse array with nullable attributes.
      */
-    private void sparseArrayNullableCreate() throws TileDBError
+    @Test
+    public void test2DVectorNullableSparse() throws TileDBError
     {
+        Context ctx = new Context();
         Dimension<Integer> d1 =
                 new Dimension<>(ctx, "d1", Integer.class, new Pair<Integer, Integer>(1, 8), 2);
 
@@ -1341,18 +1288,13 @@ public class TestTileDBQueries
         schema.addAttribute(a2);
 
         Array.create(sparseURI, schema);
-    }
 
-    /**
-     * Populating the sparse array with nullable attributes.
-     * @throws TileDBError
-     */
-    private void sparseArrayNullableWrite() throws TileDBError
-    {
+        //write array
+
         NativeArray data = new NativeArray(ctx, new int[] {1, 2, 3, 4, 5}, Integer.class);
 
         // Prepare cell buffers
-        NativeArray a1 = new NativeArray(ctx, new int[] {1, 2, 3, 4, 5}, Integer.class);
+        NativeArray na1 = new NativeArray(ctx, new int[] {1, 2, 3, 4, 5}, Integer.class);
 
         NativeArray a2Data = new NativeArray(ctx, "aabbccddee", Datatype.TILEDB_STRING_ASCII);
         NativeArray a2Off = new NativeArray(ctx, new long[] {0, 2, 4, 6, 8}, Datatype.TILEDB_UINT64);
@@ -1368,7 +1310,7 @@ public class TestTileDBQueries
                 new NativeArray(ctx, new short[] {1, 1, 1, 0, 0}, Datatype.TILEDB_UINT8);
 
         query.setBuffer("d1", data);
-        query.setBufferNullable("a1", a1, a1ByteMap);
+        query.setBufferNullable("a1", na1, a1ByteMap);
         query.setBufferNullable("a2", a2Off, a2Data, a2ByteMap);
 
         // Submit query
@@ -1377,14 +1319,6 @@ public class TestTileDBQueries
         query.finalizeQuery();
         query.close();
         array.close();
-    }
-
-    /**
-     * Reads a two-dimensional sparse array with nullable attributes.
-     */
-    @Test
-    public void test2DVectorNullableSparse()
-    {
         String selectSql = format("SELECT * FROM %s ORDER BY d1 ASC", sparseURI);
         MaterializedResult selectResult = computeActual(selectSql);
         MaterializedResult expected = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), INTEGER, INTEGER, VARCHAR)
@@ -1394,8 +1328,12 @@ public class TestTileDBQueries
                 .row(4, 4, null)
                 .row(5, 5, null)
                 .build();
-
         assertEquals(expected.toString(), selectResult.toString());
+
+        if (Files.exists(Paths.get(sparseURI))) {
+            TileDBObject.remove(ctx, sparseURI);
+        }
+        ctx.close();
     }
 
     /**
@@ -1735,19 +1673,9 @@ public class TestTileDBQueries
         queryRunner.execute(dropSql);
     }
 
-    private void removeArrayIfExists(String arrayName)
-    {
-        try {
-            TileDBObject.remove(ctx, arrayName);
-        }
-        catch (Exception e) {
-            // Do nothing
-        }
-    }
-
     private void createYearArray(String arrayName) throws TileDBError
     {
-        removeArrayIfExists(arrayName);
+        Context ctx = new Context();
         // Create dimensions
         Dimension d1 =
                 new Dimension(ctx, "d1", Datatype.TILEDB_INT32, new Pair(0, 3), 4);
@@ -1844,5 +1772,6 @@ public class TestTileDBQueries
             // Submit query
             query.submit();
         }
+        ctx.close();
     }
 }
