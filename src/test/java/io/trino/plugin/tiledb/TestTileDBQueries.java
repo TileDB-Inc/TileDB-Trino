@@ -66,7 +66,7 @@ import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
-import static io.trino.spi.type.TimestampType.TIMESTAMP;
+import static io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.testing.assertions.Assert.assertEquals;
@@ -463,7 +463,7 @@ public class TestTileDBQueries
         String selectSql = format("SELECT * FROM %s ORDER BY x ASC", arrayName);
         MaterializedResult selectResult = computeActual(selectSql);
 
-        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TIMESTAMP, INTEGER)
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TIMESTAMP_MILLIS, INTEGER)
                 .row(LocalDateTime.of(2012, 10, 10, 10, 0, 0), 10)
                 .row(LocalDateTime.of(2012, 11, 10, 10, 0, 0), 13)
                 .row(LocalDateTime.of(2012, 12, 10, 10, 0, 0), 15)
@@ -471,7 +471,7 @@ public class TestTileDBQueries
 
         selectSql = format("SELECT * FROM %s WHERE x > timestamp '2012-11-10 10:00' ORDER BY x ASC", arrayName);
         selectResult = computeActual(selectSql);
-        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TIMESTAMP, INTEGER)
+        assertEquals(selectResult, MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), TIMESTAMP_MILLIS, INTEGER)
                 .row(LocalDateTime.of(2012, 12, 10, 10, 0, 0), 15)
                 .build());
 
