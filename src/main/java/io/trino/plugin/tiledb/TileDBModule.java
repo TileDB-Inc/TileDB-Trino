@@ -43,7 +43,7 @@ import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
-import static io.trino.spi.type.TimestampType.TIMESTAMP;
+import static io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static java.util.Objects.requireNonNull;
@@ -137,7 +137,7 @@ public class TileDBModule
             case TILEDB_DATETIME_SEC:
             case TILEDB_DATETIME_MIN:
             case TILEDB_DATETIME_HR:
-                return TIMESTAMP;
+                return TIMESTAMP_MILLIS;
             case TILEDB_DATETIME_DAY:
             case TILEDB_DATETIME_WEEK:
             case TILEDB_DATETIME_MONTH:
@@ -187,7 +187,7 @@ public class TileDBModule
         else if (type.equals(DATE)) {
             return TILEDB_DATETIME_DAY;
         }
-        else if (type.equals(TIMESTAMP)) {
+        else if (type.equals(TIMESTAMP_MILLIS)) {
             return Datatype.TILEDB_DATETIME_MS;
         }
         //TODO: HANDLE ANY and other types

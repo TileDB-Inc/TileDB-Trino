@@ -69,7 +69,7 @@ import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
-import static io.trino.spi.type.TimestampType.TIMESTAMP;
+import static io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static java.lang.Float.intBitsToFloat;
@@ -528,7 +528,7 @@ public class TileDBPageSink
 
             columnBuffer.setItem(bufferPosition, value);
         }
-        else if (TIMESTAMP.equals(type)) {
+        else if (TIMESTAMP_MILLIS.equals(type)) {
             columnBuffer.setItem(bufferPosition, type.getLong(block, position));
         }
         else {
