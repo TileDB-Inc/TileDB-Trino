@@ -307,7 +307,7 @@ public class TileDBMetadata
     }
 
     @Override
-    public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> columns, RetryMode retryMode)
     {
         // Get schema/table names
         ConnectorTableMetadata tableMetadata = getTableMetadata(session, tableHandle);
