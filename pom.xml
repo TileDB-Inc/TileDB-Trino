@@ -6,7 +6,7 @@
     <parent>
         <artifactId>trino-root</artifactId>
         <groupId>io.trino</groupId>
-        <version>390</version>
+        <version>395</version>
     </parent>
 
     <artifactId>trino-tiledb</artifactId>
@@ -49,12 +49,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.oshi</groupId>
-            <artifactId>oshi-core</artifactId>
-            <version>5.8.5</version>
         </dependency>
 
         <dependency>
@@ -145,7 +139,7 @@
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-testing</artifactId>
-            <version>390</version>
+            <version>395</version>
             <scope>test</scope>
         </dependency>
 

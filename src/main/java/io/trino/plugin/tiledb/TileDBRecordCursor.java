@@ -1053,7 +1053,7 @@ public class TileDBRecordCursor
      */
     private boolean canReallocBuffers()
     {
-        long freeMemory = this.tileDBClient.getHardwareAbstractionLayer().getMemory().getAvailable();
+        long freeMemory = this.tileDBClient.getFreeMemory();
 
         long totalBufferSizes = calculateNativeArrayByteSizes();
 
