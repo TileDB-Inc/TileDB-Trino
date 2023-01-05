@@ -13,17 +13,15 @@
  */
 package io.trino.plugin.tiledb;
 
-import io.airlift.tpch.TpchTable;
 import io.tiledb.java.api.Context;
 import io.tiledb.java.api.TileDBError;
 import io.trino.spi.TrinoException;
-import io.trino.testing.AbstractTestIntegrationSmokeTest;
+import io.trino.spi.type.VarcharType;
+import io.trino.testing.AbstractTestQueries;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.QueryRunner;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import static io.tiledb.java.api.TileDBObject.remove;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.testing.assertions.Assert.assertEquals;
@@ -31,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Test
 public class TestTileDBIntegrationSmokeTest
-        extends AbstractTestIntegrationSmokeTest
+        extends AbstractTestQueries
 {
     private Context ctx;
 
@@ -55,6 +53,23 @@ public class TestTileDBIntegrationSmokeTest
     protected QueryRunner createQueryRunner() throws Exception
     {
         return TileDBQueryRunner.createTileDBQueryRunner();
+    }
+
+    @Override
+    public void testShowColumns()
+    {
+        MaterializedResult actual = this.computeActual("SHOW COLUMNS FROM orders");
+        MaterializedResult expected = MaterializedResult.resultBuilder(this.getSession(), VarcharType.VARCHAR, VarcharType.VARCHAR, VarcharType.VARCHAR, VarcharType.VARCHAR)
+                .row("orderkey", "bigint", "", "Dimension")
+                .row("custkey", "bigint", "", "Dimension")
+                .row("orderstatus", "varchar(1)", "", "Attribute")
+                .row("totalprice", "double", "", "Attribute")
+                .row("orderdate", "date", "", "Attribute")
+                .row("orderpriority", "varchar", "", "Attribute")
+                .row("clerk", "varchar", "", "Attribute")
+                .row("shippriority", "integer", "", "Attribute")
+                .row(new Object[]{"comment", "varchar", "", "Attribute"}).build();
+        assertThat(actual.equals(expected));
     }
 
     @Test
@@ -83,18 +98,18 @@ public class TestTileDBIntegrationSmokeTest
                         ")");
     }
 
-    @AfterClass(alwaysRun = true)
-    public final void destroy()
-    {
-        for (TpchTable<?> table : TpchTable.getTables()) {
-            try {
-                remove(ctx, table.getTableName());
-            }
-            catch (TileDBError tileDBError) {
-                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
-            }
-        }
-    }
+//    @AfterClass(alwaysRun = true)
+//    public final void destroy()
+//    {
+//        for (TpchTable<?> table : TpchTable.getTables()) {
+//            try {
+//                remove(ctx, table.getTableName());
+//            }
+//            catch (TileDBError tileDBError) {
+//                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
+//            }
+//        }
+//    }
 
     private MaterializedResult getExpectedOrdersTableDescription(boolean parametrizedVarchar)
     {
