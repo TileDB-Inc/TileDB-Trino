@@ -21,6 +21,7 @@ import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorSession;
+import oshi.hardware.HardwareAbstractionLayer;
 
 import javax.inject.Inject;
 
@@ -61,6 +62,8 @@ public class TileDBClient
     protected Context ctx;
 
     protected TileDBConfig config;
+    protected oshi.SystemInfo systemInfo;
+    protected HardwareAbstractionLayer hardwareAbstractionLayer;
 
     private final String defaultSchema = "tiledb";
 
@@ -91,6 +94,15 @@ public class TileDBClient
         if (!schemas.containsKey(defaultSchema)) {
             schemas.put(defaultSchema, new HashMap<>());
         }
+
+        systemInfo = new oshi.SystemInfo();
+
+        hardwareAbstractionLayer = systemInfo.getHardware();
+    }
+
+    public HardwareAbstractionLayer getHardwareAbstractionLayer()
+    {
+        return hardwareAbstractionLayer;
     }
 
     /**
@@ -310,6 +322,7 @@ public class TileDBClient
 
     public long getFreeMemory()
     {
-        return Runtime.getRuntime().freeMemory();
+        long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        return Runtime.getRuntime().maxMemory() - usedMemory;
     }
 }
