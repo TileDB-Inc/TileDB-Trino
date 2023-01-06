@@ -13,12 +13,19 @@
  */
 package io.trino.plugin.tiledb;
 
+import io.airlift.tpch.TpchTable;
+import io.tiledb.java.api.Context;
+import io.tiledb.java.api.TileDBError;
+import io.tiledb.java.api.TileDBObject;
+import io.trino.spi.TrinoException;
 import io.trino.spi.type.VarcharType;
 import io.trino.testing.AbstractTestQueries;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.QueryRunner;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
+import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.testing.assertions.Assert.assertEquals;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,20 +93,20 @@ public class TestTileDBIntegrationSmokeTest
                         ")");
     }
 
-//    @AfterClass(alwaysRun = true)
-//    public final void destroy() throws TileDBError
-//    {
-//        Context context = new Context();
-//        for (TpchTable<?> table : TpchTable.getTables()) {
-//            try {
-//                TileDBObject.remove(context, table.getTableName());
-//            }
-//            catch (TileDBError tileDBError) {
-//                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
-//            }
-//        }
-//        context.close();
-//    }
+    @AfterClass(alwaysRun = true)
+    public final void destroy() throws TileDBError
+    {
+        Context context = new Context();
+        for (TpchTable<?> table : TpchTable.getTables()) {
+            try {
+                TileDBObject.remove(context, table.getTableName());
+            }
+            catch (TileDBError tileDBError) {
+                throw new TrinoException(TILEDB_UNEXPECTED_ERROR, tileDBError);
+            }
+        }
+        context.close();
+    }
 
     private MaterializedResult getExpectedOrdersTableDescription(boolean parametrizedVarchar)
     {

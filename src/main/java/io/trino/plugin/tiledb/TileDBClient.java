@@ -319,10 +319,4 @@ public class TileDBClient
         }
         return localCtx;
     }
-
-    public long getFreeMemory()
-    {
-        long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        return Runtime.getRuntime().maxMemory() - usedMemory;
-    }
 }
