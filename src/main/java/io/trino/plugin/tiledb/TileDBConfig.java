@@ -35,7 +35,7 @@ public class TileDBConfig
 
     private int readBufferSize = 1024 * 1024 * 10;
 
-    private int writeBufferSize = 1024 * 1024 * 10;
+    private int writeBufferSize = 1024 * 1024 * 1;
 
     private String awsAccessKeyId;
 

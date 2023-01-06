@@ -30,7 +30,7 @@ public class TestTileDBConfig
         assertRecordedDefaults(recordDefaults(TileDBConfig.class)
                 .setArrayURIs(null)
                 .setReadBufferSize(10485760)
-                .setWriteBufferSize(10485760)
+                .setWriteBufferSize(1048576)
                 .setAwsAccessKeyId(null)
                 .setAwsSecretAccessKey(null)
                 .setTileDBConfig(null));
@@ -64,7 +64,7 @@ public class TestTileDBConfig
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("array-uris", "file:///test,s3:///test-bucket/array")
                 .put("read-buffer-size", "1048576")
-                .put("write-buffer-size", "1048576")
+                .put("write-buffer-size", "104857")
                 .put("aws-access-key-id", "123")
                 .put("aws-secret-access-key", "abc")
                 .put("tiledb-config", "key1=value1,key2=value2").build();
@@ -73,7 +73,7 @@ public class TestTileDBConfig
         expected = new TileDBConfig()
                 .setArrayURIs("file:///test,s3:///test-bucket/array")
                 .setReadBufferSize(1048576)
-                .setWriteBufferSize(1048576)
+                .setWriteBufferSize(104857)
                 .setAwsAccessKeyId("123")
                 .setAwsSecretAccessKey("abc")
                 .setTileDBConfig("key1=value1,key2=value2");
