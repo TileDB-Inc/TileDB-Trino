@@ -176,7 +176,7 @@ public class TileDBPageSink
         buffers.clear();
         query.resetBuffers();
 
-        validityMaps = new short[columnHandles.size()][maxBufferSize];
+        validityMaps = new short[columnHandles.size()][];
         // Loop through each column
         for (int channel = 0; channel < columnHandles.size(); channel++) {
             // Datatype
@@ -195,9 +195,16 @@ public class TileDBPageSink
             if (isVariableLength) {
                 offsets = new NativeArray(ctx, maxBufferSize, Datatype.TILEDB_UINT64);
             }
-            if (!columnHandle.getIsDimension()) {
-                Arrays.fill(validityMaps[channel], (short) 1); // all valid
+
+            // allocate validity buffers for nullable attributes only.
+            if (array.getSchema().hasAttribute(columnName)) {
+                Attribute attribute = array.getSchema().getAttribute(columnHandle.getColumnName());
+                if (attribute.getNullable()) {
+                    validityMaps[channel] = new short[maxBufferSize / type.getNativeSize()]; //allocate for the max amount of values
+                    Arrays.fill(validityMaps[channel], (short) 1); // all valid
+                }
             }
+
             buffers.put(columnName, new Pair<>(offsets, values));
         }
     }
