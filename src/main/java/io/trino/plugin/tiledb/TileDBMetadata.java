@@ -69,7 +69,6 @@ import static io.trino.plugin.tiledb.TileDBColumnProperties.getDimension;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getExtent;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getFilterList;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getLowerBound;
-import static io.trino.plugin.tiledb.TileDBColumnProperties.getNullable;
 import static io.trino.plugin.tiledb.TileDBColumnProperties.getUpperBound;
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_CREATE_TABLE_ERROR;
 import static io.trino.plugin.tiledb.TileDBModule.tileDBTypeFromTrinoType;
@@ -438,7 +437,7 @@ public class TileDBMetadata
                     if (filterPairs.isPresent()) {
                         attribute.setFilterList(Util.createTileDBFilterList(localCtx, filterPairs.get()));
                     }
-                    attribute.setNullable(getNullable(columnProperties));
+                    attribute.setNullable(column.isNullable());
                     arraySchema.addAttribute(attribute);
                 }
 
