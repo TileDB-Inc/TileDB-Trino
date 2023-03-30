@@ -28,6 +28,7 @@ import io.tiledb.java.api.Query;
 import io.tiledb.java.api.QueryCondition;
 import io.tiledb.java.api.QueryStatus;
 import io.tiledb.java.api.Stats;
+import io.tiledb.java.api.SubArray;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.libtiledb.tiledb_query_condition_op_t;
 import io.trino.plugin.tiledb.util.Util;
@@ -224,9 +225,9 @@ public class TileDBRecordCursor
 
     private static final OffsetDateTime zeroDateTime = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC);
 
-    public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query) throws TileDBError
+    public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query, Context localCtx) throws TileDBError
     {
-        this.ctx = tileDBClient.buildContext(session);
+        this.ctx = localCtx;
         this.tileDBClient = requireNonNull(tileDBClient, "tileDBClient is null");
         this.columnHandles = columnHandles;
         this.array = array;
@@ -451,6 +452,7 @@ public class TileDBRecordCursor
 
             int dimIdx = 0;
             //iterate dimensions
+            SubArray subArray = new SubArray(ctx, array);
             for (Dimension dimension : dimensions) {
                 Pair dimBounds = getBoundsForDimension(split, dimension, nonEmptyDomain);
                 Class classType = getJavaType(dimension.getType());
@@ -460,17 +462,19 @@ public class TileDBRecordCursor
                     if (dimBounds.getFirst().equals(dimBounds.getSecond())) {
                         continue;
                     }
-                    query.addRangeVar(dimIdx, dimBounds.getFirst().toString(), dimBounds.getSecond().toString());
+                    subArray.addRangeVar(dimIdx, dimBounds.getFirst().toString(), dimBounds.getSecond().toString());
                 }
                 else {
-                    query.addRange(dimIdx, ConvertUtils.convert(dimBounds.getFirst(), classType),
-                            ConvertUtils.convert(dimBounds.getSecond(), classType));
+                    subArray.addRange(dimIdx, ConvertUtils.convert(dimBounds.getFirst(), classType),
+                            ConvertUtils.convert(dimBounds.getSecond(), classType), null);
                 }
-
                 LOG.info("Query %s setting range for dimension %s to [%s, %s]", queryId, dimension.getName(), dimBounds.getFirst(), dimBounds.getSecond());
                 dimIdx++;
                 dimension.close();
             }
+
+            query.setSubarray(subArray);
+
             //iterate attributes
             HashMap<String, Attribute> attributes = arraySchema.getAttributes();
             Iterator it = attributes.entrySet().iterator();
@@ -558,7 +562,7 @@ public class TileDBRecordCursor
      */
     private Pair getBoundsForAttribute(TileDBSplit split, Attribute attribute) throws TileDBError
     {
-        if (emptyQueryAttributes.contains(attribute.toString())) {
+        if (emptyQueryAttributes.contains(attribute.getName())) {
             return new Pair<>("", "");
         }
 
@@ -596,7 +600,7 @@ public class TileDBRecordCursor
         }
         //We keep a record of all the attributes in which an empty-lookup was queried.
         if (attribute.getType().javaClass().equals(String.class) && lowerBound != null && upperBound != null && lowerBound.equals("") && upperBound.equals("")) {
-            emptyQueryAttributes.add(attribute.toString());
+            emptyQueryAttributes.add(attribute.getName());
         }
 
         recordFunctionTime("getBoundsForAttribute", timer);

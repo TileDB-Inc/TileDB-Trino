@@ -111,18 +111,19 @@ public class TileDBPageSink
     public TileDBPageSink(TileDBOutputTableHandle handle, TileDBClient tileDBClient, ConnectorSession session)
     {
         try {
-            ctx = tileDBClient.buildContext(session);
-            // Set max write buffer size from session configuration parameter
-            this.maxBufferSize = getWriteBufferSize(session);
-
             String key = getEncryptionKey(session);
 
             if (key != null) {
-                array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+                ctx = tileDBClient.buildContext(session, EncryptionType.TILEDB_AES_256_GCM, key);
             }
             else {
-                array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE);
+                ctx = tileDBClient.buildContext(session, null, null);
             }
+            // Set max write buffer size from session configuration parameter
+            this.maxBufferSize = getWriteBufferSize(session);
+
+            array = new Array(ctx, handle.getURI(), QueryType.TILEDB_WRITE);
+
             // Create query object
             query = new Query(array, QueryType.TILEDB_WRITE);
             // All writes are unordered
