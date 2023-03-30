@@ -1761,14 +1761,14 @@ public class TestTileDBQueries
         try (Query query = new Query(array, TILEDB_WRITE)) {
             query
                     .setLayout(TILEDB_ROW_MAJOR)
-                    .setBuffer("ms", msBuffer)
-                    .setBuffer("sec", msBuffer)
-                    .setBuffer("min", secBuffer)
-                    .setBuffer("hour", hourBuffer)
-                    .setBuffer("day", dayBuffer)
-                    .setBuffer("week", weekBuffer)
-                    .setBuffer("month", monthBuffer)
-                    .setBuffer("year", yearsBuffer);
+                    .setDataBuffer("ms", msBuffer)
+                    .setDataBuffer("sec", msBuffer)
+                    .setDataBuffer("min", secBuffer)
+                    .setDataBuffer("hour", hourBuffer)
+                    .setDataBuffer("day", dayBuffer)
+                    .setDataBuffer("week", weekBuffer)
+                    .setDataBuffer("month", monthBuffer)
+                    .setDataBuffer("year", yearsBuffer);
             // Submit query
             query.submit();
         }

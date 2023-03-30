@@ -22,7 +22,6 @@ import io.tiledb.java.api.Context;
 import io.tiledb.java.api.Datatype;
 import io.tiledb.java.api.Dimension;
 import io.tiledb.java.api.Domain;
-import io.tiledb.java.api.EncryptionType;
 import io.tiledb.java.api.TileDBError;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.type.Type;
@@ -51,9 +50,7 @@ public class TileDBTable
             @JsonProperty("name") String schema,
             @JsonProperty("name") String name,
             @JsonProperty("uri") URI uri,
-            Context ctx,
-            EncryptionType encryptionType,
-            byte[] encryptionKey) throws TileDBError
+            Context ctx) throws TileDBError
     {
         checkArgument(!isNullOrEmpty(schema), "schema is null or is empty");
         checkArgument(!isNullOrEmpty(name), "name is null or is empty");
@@ -63,13 +60,7 @@ public class TileDBTable
 
         ImmutableList.Builder<ColumnMetadata> columnsMetadata = ImmutableList.builder();
         ImmutableList.Builder<TileDBColumn> columns = ImmutableList.builder();
-        ArraySchema s;
-        if (encryptionType != null && encryptionKey != null) {
-            s = new ArraySchema(ctx, uri.toString(), encryptionType, encryptionKey);
-        }
-        else {
-            s = new ArraySchema(ctx, uri.toString());
-        }
+        ArraySchema s = new ArraySchema(ctx, uri.toString());
         Domain domain = s.getDomain();
         // Add dimensions as a column
         for (Dimension dimension : domain.getDimensions()) {

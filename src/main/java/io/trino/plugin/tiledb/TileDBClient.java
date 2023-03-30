@@ -122,26 +122,13 @@ public class TileDBClient
      */
     public TileDBTable addTableFromURI(Context localCtx, String schema, URI arrayUri)
     {
-        return addTableFromURI(localCtx, schema, arrayUri, null, null);
-    }
-
-    /**
-     * Helper function to add a table to the catalog
-     * @param schema schema to add table to
-     * @param arrayUri uri of array/table
-     * @param encryptionType The encryption type
-     * @param encryptionKey The encryption key in bytes
-     */
-    public TileDBTable addTableFromURI(Context localCtx, String schema, URI arrayUri, EncryptionType encryptionType,
-                                       byte[] encryptionKey)
-    {
         // Currently create the "table name" by splitting the path and grabbing the last part.
         String path = arrayUri.getPath();
         String tableName = path.substring(path.lastIndexOf('/') + 1);
         // Create a table instances
         TileDBTable tileDBTable = null;
         try {
-            tileDBTable = new TileDBTable(schema, tableName, arrayUri, localCtx, encryptionType, encryptionKey);
+            tileDBTable = new TileDBTable(schema, tableName, arrayUri, localCtx);
             Map<String, TileDBTable> tableMapping = schemas.get(schema);
             if (tableMapping == null) {
                 tableMapping = new HashMap<>();
@@ -190,7 +177,7 @@ public class TileDBClient
      * @return table object
      */
     public TileDBTable getTable(ConnectorSession session, String schema, String tableName,
-                                EncryptionType encryptionType, byte[] encryptionKey)
+                                EncryptionType encryptionType, String encryptionKey)
     {
         requireNonNull(schema, "schema is null");
         requireNonNull(tableName, "tableName is null");
@@ -198,8 +185,8 @@ public class TileDBClient
         // If the table does not already exists we should try to see if the user is passing an array uri
         if (tables == null || tables.get(tableName) == null) {
             try {
-                Context localCtx = buildContext(session);
-                return addTableFromURI(localCtx, schema, new URI(tableName), encryptionType, encryptionKey);
+                Context localCtx = buildContext(session, encryptionType, encryptionKey);
+                return addTableFromURI(localCtx, schema, new URI(tableName));
             }
             catch (URISyntaxException e) {
                 throw new TrinoException(TILEDB_UNEXPECTED_ERROR, e);
@@ -221,7 +208,7 @@ public class TileDBClient
     {
         String key = TileDBSessionProperties.getEncryptionKey(session);
         if (key != null) {
-            return this.getTable(session, schema, tableName, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+            return this.getTable(session, schema, tableName, EncryptionType.TILEDB_AES_256_GCM, key);
         }
         else {
             return this.getTable(session, schema, tableName, null, null);
@@ -253,7 +240,7 @@ public class TileDBClient
     public void dropTable(ConnectorSession session, TileDBTableHandle handle)
     {
         try {
-            Context localCtx = buildContext(session);
+            Context localCtx = buildContext(session, null, null);
             TileDBObject.remove(localCtx, handle.getURI());
             schemas.get(handle.getSchemaName()).remove(handle.getTableName());
             ctx.close();
@@ -283,13 +270,23 @@ public class TileDBClient
         }
     }
 
-    public Context buildContext(ConnectorSession session) throws TileDBError
+    public Context buildContext(ConnectorSession session, EncryptionType encryptionType, String encryptionKey) throws TileDBError
     {
-        Context localCtx = ctx;
+        Config tileDBConfig = new Config();
+        boolean updateCtx = false;
+
+        // Encryption
+        String currentKey = ctx.getConfig().get("sm.encryption_key");
+        boolean currentDifferent = !currentKey.equals(encryptionKey);
+        // add a key only if the current is different
+        if (encryptionType != null && encryptionKey != null && currentDifferent) {
+            tileDBConfig.set("sm.encryption_type", encryptionType.toString().replace("TILEDB_", ""));
+            tileDBConfig.set("sm.encryption_key", encryptionKey);
+            updateCtx = true;
+        }
+
         if (session != null) {
             String configString = getTileDBConfig(session);
-            Config tileDBConfig = new Config();
-            boolean updateCtx = false;
 
             // If the user set any tiledb config parameters, we will set them here
             if (configString != null) {
@@ -313,10 +310,10 @@ public class TileDBClient
                 updateCtx = true;
             }
             if (updateCtx) {
-                localCtx = new Context(tileDBConfig);
+                ctx = new Context(tileDBConfig);
             }
             tileDBConfig.close();
         }
-        return localCtx;
+        return ctx;
     }
 }

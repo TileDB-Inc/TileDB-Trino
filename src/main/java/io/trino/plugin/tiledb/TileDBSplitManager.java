@@ -92,11 +92,11 @@ public class TileDBSplitManager
             Array array;
             String key = getEncryptionKey(session);
             if (key == null) {
-                array = new Array(tileDBClient.buildContext(session), tableHandle.getURI());
+                array = new Array(tileDBClient.buildContext(session, null, null), tableHandle.getURI());
             }
             else {
-                array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), QueryType.TILEDB_READ,
-                        EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+                array = new Array(tileDBClient.buildContext(session, EncryptionType.TILEDB_AES_256_GCM, key),
+                        tableHandle.getURI(), QueryType.TILEDB_READ);
             }
             int numSplits = TileDBSessionProperties.getSplits(session);
             if (numSplits == -1) {
@@ -150,10 +150,11 @@ public class TileDBSplitManager
                 Array array;
                 String key = getEncryptionKey(session);
                 if (key == null) {
-                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ);
+                    array = new Array(tileDBClient.buildContext(session, null, null), tableHandle.getURI(), TILEDB_READ);
                 }
                 else {
-                    array = new Array(tileDBClient.buildContext(session), tableHandle.getURI(), TILEDB_READ, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+                    array = new Array(tileDBClient.buildContext(session, EncryptionType.TILEDB_AES_256_GCM, key),
+                            tableHandle.getURI(), TILEDB_READ);
                 }
 
                 HashMap<String, Pair> nonEmptyDomain = array.nonEmptyDomain();

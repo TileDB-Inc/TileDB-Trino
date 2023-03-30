@@ -120,7 +120,7 @@ public class TileDBMetadata
 
         String key = getEncryptionKey(session);
         if (key != null) {
-            table = tileDBClient.getTable(session, tableName.getSchemaName(), tableName.getTableName(), EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
+            table = tileDBClient.getTable(session, tableName.getSchemaName(), tableName.getTableName(), EncryptionType.TILEDB_AES_256_GCM, key);
         }
         else {
             table = tileDBClient.getTable(session, tableName.getSchemaName(), tableName.getTableName());
@@ -365,8 +365,14 @@ public class TileDBMetadata
         Map<String, Object> properties = tableMetadata.getProperties();
 
         try {
-            Context localCtx = tileDBClient.buildContext(session);
-
+            String key = getEncryptionKey(tableMetadata.getProperties());
+            Context localCtx;
+            if (key != null) {
+                localCtx = tileDBClient.buildContext(session, EncryptionType.TILEDB_AES_256_GCM, key);
+            }
+            else {
+                localCtx = tileDBClient.buildContext(session, null, null);
+            }
             // Get URI from table properties
             String uri;
             if (properties.containsKey(TileDBTableProperties.URI)) {
@@ -477,15 +483,8 @@ public class TileDBMetadata
             arraySchema.check();
             TileDBTable tileDBTable;
 
-            String key = getEncryptionKey(tableMetadata.getProperties());
-            if (key != null) {
-                Array.create(uri, arraySchema, EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
-                tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri), EncryptionType.TILEDB_AES_256_GCM, key.getBytes());
-            }
-            else {
-                Array.create(uri, arraySchema);
-                tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri));
-            }
+            Array.create(uri, arraySchema);
+            tileDBTable = tileDBClient.addTableFromURI(localCtx, schema, new URI(uri));
 
             // Clean up
             domain.close();
