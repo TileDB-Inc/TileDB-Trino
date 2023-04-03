@@ -166,9 +166,10 @@ public class Util
      * Parses a comma-separated filter list and returns a list with key-value pairs,
      * where the key is the filter name (e.g. bzip2) and the value the filter's value
      * (e.g. -1)
-     * @param csvList
-     * @return
-     * @throws IllegalArgumentException
+     *
+     * @param csvList The csv list
+     * @return the parsed filter list
+     * @throws IllegalArgumentException Exception
      */
     public static Optional<List<Pair<String, Integer>>> tryParseFilterList(String csvList)
             throws IllegalArgumentException
@@ -211,10 +212,11 @@ public class Util
 
     /**
      * Returns a TileDB FilterList
+     *
      * @param ctx The context
      * @param filterListDesc The filter pairs list extracted with the tryParseFilterList method
      * @return The FilterList instance
-     * @throws TileDBError
+     * @throws TileDBError TileDBError
      */
     public static FilterList createTileDBFilterList(
             Context ctx, List<Pair<String, Integer>> filterListDesc) throws TileDBError

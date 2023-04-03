@@ -107,6 +107,7 @@ public class TileDBClient
 
     /**
      * Get plugin configuration
+     *
      * @return TileDB plugin configuration
      */
     public TileDBConfig getConfig()
@@ -146,7 +147,8 @@ public class TileDBClient
 
     /**
      * Return list of schema's. Since we don't have true discovery this is a static map which we return the keys
-     * @return List of tiledb schema names (currently just "tiledb")
+     *
+     * @return List of tiledb schema names (currently just "TileDB")
      */
     public Set<String> getSchemaNames()
     {
@@ -155,7 +157,8 @@ public class TileDBClient
 
     /**
      * Return all "tables" in a schema
-     * @param schema
+     *
+     * @param schema the schema
      * @return Set of table names
      */
     public Set<String> getTableNames(String schema)
@@ -170,10 +173,11 @@ public class TileDBClient
 
     /**
      * Fetches a table object given a schema and a table name
-     * @param schema
-     * @param tableName
-     * @param encryptionType
-     * @param encryptionKey
+     *
+     * @param schema the schema
+     * @param tableName the table name
+     * @param encryptionType the encryption type
+     * @param encryptionKey the encryption key
      * @return table object
      */
     public TileDBTable getTable(ConnectorSession session, String schema, String tableName,
@@ -200,8 +204,9 @@ public class TileDBClient
 
     /**
      * Fetches a table object given a schema and a table name
-     * @param schema
-     * @param tableName
+     *
+     * @param schema the schema
+     * @param tableName the table name
      * @return table object
      */
     public TileDBTable getTable(ConnectorSession session, String schema, String tableName)
@@ -222,7 +227,8 @@ public class TileDBClient
 
     /**
      * Rollback a create table statement, this just drops the array
-     * @param handle tiledb table handler
+     *
+     * @param handle TileDB table handler
      */
     public void rollbackCreateTable(TileDBOutputTableHandle handle)
     {

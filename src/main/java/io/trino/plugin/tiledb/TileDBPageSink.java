@@ -104,9 +104,10 @@ public class TileDBPageSink
 
     /**
      * Initialize an instance of page sink preparing for inserts
+     *
      * @param handle table handler
      * @param tileDBClient client (for context)
-     * @param session
+     * @param session the session
      */
     public TileDBPageSink(TileDBOutputTableHandle handle, TileDBClient tileDBClient, ConnectorSession session)
     {
@@ -144,8 +145,9 @@ public class TileDBPageSink
 
     /**
      * Reset query, as of TileDB 2.0 a query object should not be reused for writing unless in global order
-     * @param buffers
-     * @throws TileDBError
+     *
+     * @param buffers the buffers
+     * @throws TileDBError TileDBError
      */
     private void resetQuery(Map<String, Pair<NativeArray, NativeArray>> buffers) throws TileDBError
     {
@@ -159,8 +161,9 @@ public class TileDBPageSink
 
     /**
      * Reset query buffers by closing and re-allocating
-     * @param buffers
-     * @throws TileDBError
+     *
+     * @param buffers the buffers
+     * @throws TileDBError TileDBError
      */
     private void resetBuffers(Map<String, Pair<NativeArray, NativeArray>> buffers) throws TileDBError
     {
@@ -212,6 +215,7 @@ public class TileDBPageSink
 
     /**
      * appendPage adds the rows
+     *
      * @param page rows/columns to insert
      * @return Future not currently used, but could be for async writing. It does not support nullable attributes for now.
      */
@@ -285,7 +289,8 @@ public class TileDBPageSink
 
     /**
      * Initialize the map holding the effective buffer sizes
-     * @param bufferEffectiveSizes
+     *
+     * @param bufferEffectiveSizes the buffer sizes
      */
     private void initBufferEffectiveSizes(Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes)
     {
@@ -300,11 +305,12 @@ public class TileDBPageSink
     }
 
     /**
-     * Submit a query to tiledb for writing
+     * Submit a query to TileDB for writing
+     *
      * @param buffers Map of buffers to write
      * @param bufferEffectiveSizes Map of effective buffer sizes
      * @return QueryStatus
-     * @throws TileDBError
+     * @throws TileDBError TileDBError
      */
     private QueryStatus submitQuery(Map<String, Pair<NativeArray, NativeArray>> buffers, Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes) throws TileDBError
     {
@@ -386,13 +392,14 @@ public class TileDBPageSink
 
     /**
      * Append a column to appropriate buffer
+     *
      * @param page Page from presto containing data
      * @param position current row number
      * @param channel column index
      * @param columnBuffer NativeBuffer for column data
      * @param bufferPosition The current position of the buffer (where a write should start)
      * @return new effective buffer size after write
-     * @throws TileDBError
+     * @throws TileDBError TileDBError
      */
     private long appendColumn(Page page, int position, int channel, NativeArray columnBuffer, int bufferPosition) throws TileDBError
     {

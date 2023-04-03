@@ -226,7 +226,8 @@ public class TileDBMetadata
     }
 
     /**
-     *  Create table creates a table without any data
+     * Create table creates a table without any data
+     *
      * @param session connector session
      * @param tableMetadata metadata for new table
      * @param ignoreExisting ignore existing tables? Currently not supported
@@ -239,6 +240,7 @@ public class TileDBMetadata
 
     /**
      * beginCreateTable creates a table with data
+     *
      * @param session connector sessions
      * @param tableMetadata metadata for table
      * @param layout layout of new table
@@ -254,6 +256,7 @@ public class TileDBMetadata
 
     /**
      * Finish/commit creating a table with data
+     *
      * @param session connector session
      * @param tableHandle table handle
      * @param fragments any fragements (ignored)
@@ -270,8 +273,9 @@ public class TileDBMetadata
     }
 
     /**
-     * Set a rollback for a method to run some function at the rollback of a presto trasnaction
-     * @param action
+     * Set a rollback for a method to run some function at the rollback of a presto transaction
+     *
+     * @param action the action
      */
     private void setRollback(Runnable action)
     {
@@ -295,7 +299,8 @@ public class TileDBMetadata
     }
 
     /**
-     * Allow dropping of a table/tiledb array
+     * Allow dropping of a table/TileDB array
+     *
      * @param session connector session
      * @param tableHandle handle of table to be dropped
      */
@@ -352,6 +357,7 @@ public class TileDBMetadata
 
     /**
      * Create an array given a presto table layout/schema
+     *
      * @param tableMetadata metadata about table
      * @return Output table handler
      */

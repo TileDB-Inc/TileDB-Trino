@@ -196,6 +196,7 @@ public class TileDBModule
 
     /**
      * This is a helper function to create an ArrayList for a given type
+     *
      * @param type datatype to create list of
      * @param isVariableLength if its variable length we will create a list of arrays
      * @return List

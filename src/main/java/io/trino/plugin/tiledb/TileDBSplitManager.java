@@ -125,6 +125,7 @@ public class TileDBSplitManager
 
     /**
      * Returns the tuple domain and the column handles
+     *
      * @param session The connector session
      * @param tableHandle The table handle
      * @param constraint The constraint
@@ -209,11 +210,11 @@ public class TileDBSplitManager
     /**
      * Split tuple domain if there are multiple ranges
      *
-     * @param tupleDomain
-     * @param splitOnlyPredicates
-     * @param nonEmptyDomains
-     * @param dimensionCount
-     * @return
+     * @param tupleDomain the tuple domain
+     * @param splitOnlyPredicates the split predicates
+     * @param nonEmptyDomains the non-empty domains
+     * @param dimensionCount the dimension count
+     * @return tuple domains after split
      */
     private List<TupleDomain<ColumnHandle>> splitTupleDomainOnRanges(TupleDomain<ColumnHandle> tupleDomain, int splits, boolean splitOnlyPredicates, HashMap<String, Pair> nonEmptyDomains, int dimensionCount)
     {
@@ -282,10 +283,11 @@ public class TileDBSplitManager
 
     /**
      * Function to generate each tuple domain combination based on a list of domains for each column handle
-     * @param lists
-     * @param result
-     * @param depth
-     * @param current
+     *
+     * @param lists the lists of domains
+     * @param result the result
+     * @param depth the depth
+     * @param current the current domain
      */
     private void generateCombinationTupleDomains(List<Pair<ColumnHandle, List<Domain>>> lists, List<Map<ColumnHandle, Domain>> result, int depth, Map<ColumnHandle, Domain> current)
     {
@@ -307,6 +309,7 @@ public class TileDBSplitManager
 
     /**
      * Split a range into N buckets. Currently only ranges of type long can be split with this naive algorithm.
+     *
      * @param range to split
      * @param buckets number
      * @param nonEmptyDomain The none empty domain, used if there the range is one sides, i.e. >= X we change to >= X AND less than MaxNonEmpty
