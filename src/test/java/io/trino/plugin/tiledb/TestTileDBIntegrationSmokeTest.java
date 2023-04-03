@@ -22,15 +22,17 @@ import io.trino.spi.type.VarcharType;
 import io.trino.testing.AbstractTestQueries;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.QueryRunner;
+import org.gaul.modernizer_maven_annotations.SuppressModernizer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static io.trino.plugin.tiledb.TileDBErrorCode.TILEDB_UNEXPECTED_ERROR;
 import static io.trino.spi.type.VarcharType.VARCHAR;
-import static io.trino.testing.assertions.Assert.assertEquals;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.testng.Assert.assertEquals;
 
 @Test
+@SuppressModernizer
 public class TestTileDBIntegrationSmokeTest
         extends AbstractTestQueries
 {

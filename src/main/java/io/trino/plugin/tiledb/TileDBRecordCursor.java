@@ -441,7 +441,6 @@ public class TileDBRecordCursor
      * Build the ranges for a query based on the split
      *
      * @param split the split to build the subArray based off of
-     * @return
      */
     private void setRanges(TileDBSplit split) throws TileDBError
     {
@@ -542,12 +541,13 @@ public class TileDBRecordCursor
 
     /**
      * Returns the Query condition for the given bound.
+     *
      * @param attr The attribute
      * @param isString True if the attribute is String
      * @param bound The bound
      * @param op TIleDB operator
      * @return The query Condition
-     * @throws TileDBError
+     * @throws TileDBError TileDBError
      */
     private QueryCondition conditionForBound(Attribute attr, boolean isString, Object bound, tiledb_query_condition_op_t op) throws TileDBError
     {
@@ -1021,6 +1021,7 @@ public class TileDBRecordCursor
 
     /**
      * Function to calculate the bytes read based on the buffer sizes
+     *
      * @return byte in current buffers
      */
     private long calculateNativeArrayByteSizes()
@@ -1053,7 +1054,8 @@ public class TileDBRecordCursor
 
     /**
      * Check if we can double the buffer, or if there is not enough memory space
-     * @return
+     *
+     * @return true if buffers can be reallocated
      */
     private boolean canReallocBuffers()
     {
@@ -1095,7 +1097,8 @@ public class TileDBRecordCursor
     /**
      * Copy buffers from NativeArray to java arrays for faster access times
      * Making the JNI calls in NativeArray is too slow
-     * @throws TileDBError
+     *
+     * @throws TileDBError TileDBError
      */
     private void copyQueryBuffers() throws TileDBError
     {
@@ -1366,6 +1369,7 @@ public class TileDBRecordCursor
 
     /**
      * Save function timing to the hashmap of times
+     *
      * @param functionName Name of function being recorded
      * @param timer Times from record
      */
