@@ -149,7 +149,8 @@ public class TileDBPageSink
      * @param buffers the buffers
      * @throws TileDBError TileDBError
      */
-    private void resetQuery(Map<String, Pair<NativeArray, NativeArray>> buffers) throws TileDBError
+    private void resetQuery(Map<String, Pair<NativeArray, NativeArray>> buffers)
+            throws TileDBError
     {
         // Create query object
         query.close();
@@ -165,7 +166,8 @@ public class TileDBPageSink
      * @param buffers the buffers
      * @throws TileDBError TileDBError
      */
-    private void resetBuffers(Map<String, Pair<NativeArray, NativeArray>> buffers) throws TileDBError
+    private void resetBuffers(Map<String, Pair<NativeArray, NativeArray>> buffers)
+            throws TileDBError
     {
         for (Map.Entry<String, Pair<NativeArray, NativeArray>> bufferEntry : buffers.entrySet()) {
             NativeArray offsets = bufferEntry.getValue().getFirst();
@@ -312,7 +314,8 @@ public class TileDBPageSink
      * @return QueryStatus
      * @throws TileDBError TileDBError
      */
-    private QueryStatus submitQuery(Map<String, Pair<NativeArray, NativeArray>> buffers, Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes) throws TileDBError
+    private QueryStatus submitQuery(Map<String, Pair<NativeArray, NativeArray>> buffers, Map<String, Pair<Optional<Long>, Long>> bufferEffectiveSizes)
+            throws TileDBError
     {
         // We have to keep track of if we created a new buffer or not and if we should clear it
         List<NativeArray> buffersToClear = new ArrayList<>();
@@ -401,7 +404,8 @@ public class TileDBPageSink
      * @return new effective buffer size after write
      * @throws TileDBError TileDBError
      */
-    private long appendColumn(Page page, int position, int channel, NativeArray columnBuffer, int bufferPosition) throws TileDBError
+    private long appendColumn(Page page, int position, int channel, NativeArray columnBuffer, int bufferPosition)
+            throws TileDBError
     {
         OffsetDateTime dt;
         Block block = page.getBlock(channel);

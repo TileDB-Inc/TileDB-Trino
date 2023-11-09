@@ -16,8 +16,7 @@ package io.trino.plugin.tiledb;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.TypeManager;
-
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import java.util.List;
 import java.util.Map;

@@ -31,7 +31,6 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 
-@Test
 @SuppressModernizer
 public class TestTileDBIntegrationSmokeTest
         extends AbstractTestQueries
@@ -47,7 +46,8 @@ public class TestTileDBIntegrationSmokeTest
     }
 
     @Override
-    protected QueryRunner createQueryRunner() throws Exception
+    protected QueryRunner createQueryRunner()
+            throws Exception
     {
         return TileDBQueryRunner.createTileDBQueryRunner();
     }
@@ -96,7 +96,8 @@ public class TestTileDBIntegrationSmokeTest
     }
 
     @AfterClass(alwaysRun = true)
-    public final void destroy() throws TileDBError
+    public final void destroy()
+            throws TileDBError
     {
         Context context = new Context();
         for (TpchTable<?> table : TpchTable.getTables()) {

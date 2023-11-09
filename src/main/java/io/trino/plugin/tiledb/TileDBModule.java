@@ -26,8 +26,7 @@ import io.trino.spi.type.TypeManager;
 import io.trino.spi.type.TypeSignature;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
-
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -102,7 +101,8 @@ public class TileDBModule
         }
     }
 
-    public static Type prestoTypeFromTileDBType(Datatype type) throws TileDBError
+    public static Type prestoTypeFromTileDBType(Datatype type)
+            throws TileDBError
     {
         switch (type) {
             case TILEDB_INT8:
@@ -149,7 +149,8 @@ public class TileDBModule
         }
     }
 
-    public static Datatype tileDBTypeFromTrinoType(Type type) throws TileDBError
+    public static Datatype tileDBTypeFromTrinoType(Type type)
+            throws TileDBError
     {
         type.getJavaType();
         if (type.equals(TINYINT)) {
@@ -202,7 +203,8 @@ public class TileDBModule
      * @return List
      * @throws TileDBError if the datatype passed is not supported
      */
-    public static List<?> getJavaListForType(Datatype type, boolean isVariableLength) throws TileDBError
+    public static List<?> getJavaListForType(Datatype type, boolean isVariableLength)
+            throws TileDBError
     {
         switch (type) {
             case TILEDB_FLOAT32: {

@@ -39,9 +39,8 @@ import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.predicate.ValueSet;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.VarcharType;
+import jakarta.inject.Inject;
 import org.apache.commons.beanutils.ConvertUtils;
-
-import javax.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.HashMap;

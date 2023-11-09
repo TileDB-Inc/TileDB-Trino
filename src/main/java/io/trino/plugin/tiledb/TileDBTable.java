@@ -50,7 +50,8 @@ public class TileDBTable
             @JsonProperty("name") String schema,
             @JsonProperty("name") String name,
             @JsonProperty("uri") URI uri,
-            Context ctx) throws TileDBError
+            Context ctx)
+            throws TileDBError
     {
         checkArgument(!isNullOrEmpty(schema), "schema is null or is empty");
         checkArgument(!isNullOrEmpty(name), "name is null or is empty");

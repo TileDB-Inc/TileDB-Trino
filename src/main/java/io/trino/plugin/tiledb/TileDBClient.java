@@ -21,9 +21,8 @@ import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.TileDBObject;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorSession;
+import jakarta.inject.Inject;
 import oshi.hardware.HardwareAbstractionLayer;
-
-import javax.inject.Inject;
 
 import java.io.File;
 import java.net.URI;
@@ -276,7 +275,8 @@ public class TileDBClient
         }
     }
 
-    public Context buildContext(ConnectorSession session, EncryptionType encryptionType, String encryptionKey) throws TileDBError
+    public Context buildContext(ConnectorSession session, EncryptionType encryptionType, String encryptionKey)
+            throws TileDBError
     {
         Config tileDBConfig = new Config();
         boolean updateCtx = false;
