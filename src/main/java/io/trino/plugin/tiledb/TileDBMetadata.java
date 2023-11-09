@@ -46,8 +46,7 @@ import io.trino.spi.connector.TableNotFoundException;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.VarcharType;
-
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import java.net.URI;
 import java.net.URISyntaxException;

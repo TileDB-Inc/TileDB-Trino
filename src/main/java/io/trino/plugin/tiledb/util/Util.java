@@ -48,7 +48,8 @@ public class Util
     private static final StringPartitioner stringPartitioner = new StringPartitioner();
 
     public static Dimension toDimension(Context localCtx, String dimName, Datatype type, Domain domain, Long extent,
-                                        Long lowerBound, Long upperBound) throws TileDBError
+                                        Long lowerBound, Long upperBound)
+            throws TileDBError
     {
         Class classType = type.javaClass();
         switch (type) {
@@ -219,7 +220,8 @@ public class Util
      * @throws TileDBError TileDBError
      */
     public static FilterList createTileDBFilterList(
-            Context ctx, List<Pair<String, Integer>> filterListDesc) throws TileDBError
+            Context ctx, List<Pair<String, Integer>> filterListDesc)
+            throws TileDBError
     {
         FilterList filterList = new FilterList(ctx);
         try {
@@ -293,7 +295,8 @@ public class Util
     /**
      * Returns v + eps, where eps is the smallest value for the datatype such that v + eps > v.
      */
-    public static Object addEpsilon(Object value, Datatype type) throws TileDBError
+    public static Object addEpsilon(Object value, Datatype type)
+            throws TileDBError
     {
         switch (type) {
             case TILEDB_CHAR:
@@ -340,7 +343,8 @@ public class Util
     /**
      * Returns v - eps, where eps is the smallest value for the datatype such that v - eps < v.
      */
-    public static Object subtractEpsilon(Object value, Datatype type) throws TileDBError
+    public static Object subtractEpsilon(Object value, Datatype type)
+            throws TileDBError
     {
         switch (type) {
             case TILEDB_CHAR:

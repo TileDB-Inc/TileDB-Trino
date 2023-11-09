@@ -47,7 +47,8 @@ public final class TileDBQueryRunner
 
     private TileDBQueryRunner() {}
 
-    public static DistributedQueryRunner createTileDBQueryRunner() throws Exception
+    public static DistributedQueryRunner createTileDBQueryRunner()
+            throws Exception
     {
         return createTileDBQueryRunner(TpchTable.getTables(), ImmutableMap.of(), ImmutableMap.of(), new Context());
     }
@@ -58,7 +59,8 @@ public final class TileDBQueryRunner
         return createTileDBQueryRunner(TpchTable.getTables(), sessionProperties, ImmutableMap.of(), new Context());
     }
 
-    public static DistributedQueryRunner createTileDBQueryRunner(TpchTable<?>... tables) throws Exception
+    public static DistributedQueryRunner createTileDBQueryRunner(TpchTable<?>... tables)
+            throws Exception
     {
         return createTileDBQueryRunner(ImmutableList.copyOf(tables), ImmutableMap.of(), ImmutableMap.of(),
                 new Context());
@@ -126,7 +128,8 @@ public final class TileDBQueryRunner
             String sourceSchema,
             Session session,
             Iterable<TpchTable<?>> tables,
-            Context ctx) throws TileDBError
+            Context ctx)
+            throws TileDBError
     {
         LOG.info("Loading data from %s.%s...", sourceCatalog, sourceSchema);
         long startTime = System.nanoTime();

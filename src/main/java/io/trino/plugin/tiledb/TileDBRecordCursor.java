@@ -225,7 +225,8 @@ public class TileDBRecordCursor
 
     private static final OffsetDateTime zeroDateTime = new Timestamp(0).toInstant().atOffset(ZoneOffset.UTC);
 
-    public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query, Context localCtx) throws TileDBError
+    public TileDBRecordCursor(TileDBClient tileDBClient, ConnectorSession session, TileDBSplit split, List<TileDBColumnHandle> columnHandles, Array array, Query query, Context localCtx)
+            throws TileDBError
     {
         this.ctx = localCtx;
         this.tileDBClient = requireNonNull(tileDBClient, "tileDBClient is null");
@@ -270,7 +271,8 @@ public class TileDBRecordCursor
     /**
      * Initialize the TileDB query for the given split.
      */
-    private void initializeQuery(TileDBSplit split) throws TileDBError
+    private void initializeQuery(TileDBSplit split)
+            throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
 
@@ -365,7 +367,8 @@ public class TileDBRecordCursor
     /**
      * Allocates a NativeArray buffer for the given attribute and adds it to the query object.
      */
-    private void initQueryBufferForField(String field, Pair<Long, Long> maxBufferElements) throws TileDBError
+    private void initQueryBufferForField(String field, Pair<Long, Long> maxBufferElements)
+            throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
         boolean isAttribute = arraySchema.getAttributes().containsKey(field);
@@ -442,7 +445,7 @@ public class TileDBRecordCursor
      *
      * @param split the split to build the subArray based off of
      */
-    private void setRanges(TileDBSplit split) throws TileDBError
+    private void setRanges(TileDBSplit split)
     {
         Pair<Long, Long> timer = startTimer();
         try (io.tiledb.java.api.Domain domain = arraySchema.getDomain()) {
@@ -549,7 +552,8 @@ public class TileDBRecordCursor
      * @return The query Condition
      * @throws TileDBError TileDBError
      */
-    private QueryCondition conditionForBound(Attribute attr, boolean isString, Object bound, tiledb_query_condition_op_t op) throws TileDBError
+    private QueryCondition conditionForBound(Attribute attr, boolean isString, Object bound, tiledb_query_condition_op_t op)
+            throws TileDBError
     {
         if (isString) {
             bound = bound.toString();
@@ -560,7 +564,8 @@ public class TileDBRecordCursor
     /**
      * Compute a (lower, upper) bound for the given attribute based on the given split.
      */
-    private Pair getBoundsForAttribute(TileDBSplit split, Attribute attribute) throws TileDBError
+    private Pair getBoundsForAttribute(TileDBSplit split, Attribute attribute)
+            throws TileDBError
     {
         if (emptyQueryAttributes.contains(attribute.getName())) {
             return new Pair<>("", "");
@@ -610,7 +615,8 @@ public class TileDBRecordCursor
     /**
      * Compute a (lower, upper) bound for the given dimension based on the given split.
      */
-    private Pair getBoundsForDimension(TileDBSplit split, Dimension dimension, HashMap<String, Pair> arrayNonEmptyDomain) throws TileDBError
+    private Pair getBoundsForDimension(TileDBSplit split, Dimension dimension, HashMap<String, Pair> arrayNonEmptyDomain)
+            throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
         TupleDomain<ColumnHandle> tupleDomain = split.getTupleDomain();
@@ -684,7 +690,8 @@ public class TileDBRecordCursor
      * Gets a lower, upper bound pair from the given individual Trino range. If a value cannot be determined for either
      * end of the interval, null is set for that end in the result.
      */
-    private Pair getBoundsForTrinoRange(Range range, Datatype type) throws TileDBError
+    private Pair getBoundsForTrinoRange(Range range, Datatype type)
+            throws TileDBError
     {
         Object dimLowerBound = null;
         Object dimUpperBound = null;
@@ -753,7 +760,8 @@ public class TileDBRecordCursor
     /**
      * Returns the minimum of the two given TileDB-typed values.
      */
-    private static Object tiledbValueMin(Object a, Object b, Datatype type) throws TileDBError
+    private static Object tiledbValueMin(Object a, Object b, Datatype type)
+            throws TileDBError
     {
         switch (type) {
             case TILEDB_FLOAT32:
@@ -799,7 +807,8 @@ public class TileDBRecordCursor
     /**
      * Returns the maximum of the two given TileDB-typed values.
      */
-    private static Object tiledbValueMax(Object a, Object b, Datatype type) throws TileDBError
+    private static Object tiledbValueMax(Object a, Object b, Datatype type)
+            throws TileDBError
     {
         switch (type) {
             case TILEDB_FLOAT32:
@@ -858,7 +867,8 @@ public class TileDBRecordCursor
     /**
      * Reallocates the query buffers by doubling their allocations.
      */
-    private void reallocateQueryBuffers() throws TileDBError
+    private void reallocateQueryBuffers()
+            throws TileDBError
     {
         if (!canReallocBuffers()) {
             throw new TileDBError("Not enough memory to complete query!");
@@ -1100,7 +1110,8 @@ public class TileDBRecordCursor
      *
      * @throws TileDBError TileDBError
      */
-    private void copyQueryBuffers() throws TileDBError
+    private void copyQueryBuffers()
+            throws TileDBError
     {
         Pair<Long, Long> timer = startTimer();
         for (Map.Entry<String, Pair<Long, Long>> entry : queryResultBufferElements.entrySet()) {

@@ -80,7 +80,8 @@ public class TestTileDBQueries
     private final String sparseURI = "sparse_array";
 
     @Override
-    protected QueryRunner createQueryRunner() throws Exception
+    protected QueryRunner createQueryRunner()
+            throws Exception
     {
         return createTileDBQueryRunner();
     }
@@ -480,7 +481,8 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testCreate1DVectorYear() throws Exception
+    public void testCreate1DVectorYear()
+            throws Exception
     {
         // Integer
         String arrayName = "test_create_year";
@@ -631,7 +633,8 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testCreateTableWithFilters() throws TileDBError
+    public void testCreateTableWithFilters()
+            throws TileDBError
     {
         // Integer
         String arrayName = "test_create_with_filters";
@@ -655,7 +658,8 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testCreateTableEncrypted() throws Exception
+    public void testCreateTableEncrypted()
+            throws Exception
     {
         // Integer
         String arrayName = "test_create_table_encrypted";
@@ -699,7 +703,7 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testTimeTraveling() throws Exception
+    public void testTimeTraveling()
     {
         // BigInt
         String arrayName = "test_time_traveling";
@@ -791,7 +795,7 @@ public class TestTileDBQueries
     }
 
     @Test
-    public void testTimeTravelingEncrypted() throws Exception
+    public void testTimeTravelingEncrypted()
     {
         // BigInt
         String arrayName = "test_time_traveling_encrypted";
@@ -1198,7 +1202,8 @@ public class TestTileDBQueries
      * Reads a two-dimensional dense array with nullable attributes.
      */
     @Test
-    public void test2DVectorNullableDense() throws Exception
+    public void test2DVectorNullableDense()
+            throws Exception
     {
         Context ctx = new Context();
         Dimension<Integer> rows =
@@ -1265,7 +1270,8 @@ public class TestTileDBQueries
      * Reads a two-dimensional sparse array with nullable attributes.
      */
     @Test
-    public void test2DVectorNullableSparse() throws TileDBError
+    public void test2DVectorNullableSparse()
+            throws TileDBError
     {
         Context ctx = new Context();
         Dimension<Integer> d1 =
@@ -1675,7 +1681,8 @@ public class TestTileDBQueries
         queryRunner.execute(dropSql);
     }
 
-    private void createYearArray(String arrayName) throws TileDBError
+    private void createYearArray(String arrayName)
+            throws TileDBError
     {
         Context ctx = new Context();
         // Create dimensions
