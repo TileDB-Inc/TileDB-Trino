@@ -17,7 +17,7 @@ jobs:
         os: [ ubuntu-latest, macos-11 ]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -55,7 +55,7 @@ jobs:
           check-latest: true
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Create-Jars
         run: set +e; mvn clean package -DskipTests; mkdir jars/; cp ./target/*.jar jars/
