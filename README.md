@@ -9,6 +9,32 @@ see the [official TileDB documentation](https://docs.tiledb.io/en/latest/introdu
 This connector allows running SQL on TileDB arrays via Trino.  The TileDB-Trino interface supports column subselection on attributes and predicate pushdown on dimension fields, leading to superb performance for
 projection and range queries.
 
+## Docker
+
+A quickstart Docker image is available. The docker image will start a single-node
+Trino cluster and open the CLI Trino interface where SQL can be run.
+The Docker image includes two example tiledb arrays
+`/opt/tiledb_example_arrays/dense_global` and `/opt/tiledb_example_arrays/sparse_global`.
+Simply build and run:
+
+```
+docker build -t tiledb-trino . 
+
+docker run -it --rm tiledb-trino
+
+```
+
+or mount a local array into the Docker container with the `-v` option:
+
+```
+docker run -it --rm -v /local/array/path:/data/local_array tiledb-trino
+```
+
+In the above example, replace `/local/array/path` with the path to the
+array folder on your local machine. The `/data/local_array` path is the
+path you will use within the Docker image to access `/local/array/path`
+(you can replace it with another path of your choice).
+
 
 ## Installation
 
