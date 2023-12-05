@@ -1,58 +1,59 @@
-FROM openjdk:8
+FROM ubuntu:20.04
 MAINTAINER help@tiledb.io
 
-ENV PRESTO_VERSION=315
-ENV PRESTO_HOME=/opt/presto
-ENV PRESTO_CONF_DIR=${PRESTO_HOME}/etc
+ENV TRINO_VERSION=433
+ENV TRINO_HOME=/opt/trino
+ENV TRINO_CONF_DIR=${TRINO_HOME}/etc
 
-# Add less for pagenation
-RUN apt-get update && apt-get install -y --no-install-recommends \
-		less && \
-    rm -rf /var/lib/apt/lists/
+# Install necessary packages including curl, ca-certificates, wget, Python 3, and Java 17
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates wget python-is-python3 openjdk-17-jdk && \
+    rm -rf /var/lib/apt/lists/*
 
-# Download presto cluster
-RUN curl -L https://repo1.maven.org/maven2/io/trino/presto-server/${PRESTO_VERSION}/presto-server-${PRESTO_VERSION}.tar.gz -o /tmp/presto-server.tgz && \
-    tar -xzf /tmp/presto-server.tgz -C /opt && \
-    ln -s /opt/presto-server-${PRESTO_VERSION} ${PRESTO_HOME} && \
-    mkdir -p ${PRESTO_HOME}/data && \
-    rm -f /tmp/presto-server.tgz
 
-# Download presto CLI
-ADD https://repo1.maven.org/maven2/io/trino/presto-cli/${PRESTO_VERSION}/presto-cli-${PRESTO_VERSION}-executable.jar ${PRESTO_HOME}/bin/
+# Download trino cluster
+RUN curl -L https://repo1.maven.org/maven2/io/trino/trino-server/${TRINO_VERSION}/trino-server-${TRINO_VERSION}.tar.gz -o /tmp/trino-server.tgz && \
+    tar -xzf /tmp/trino-server.tgz -C /opt && \
+    ln -s /opt/trino-server-${TRINO_VERSION} ${TRINO_HOME} && \
+    mkdir -p ${TRINO_HOME}/data && \
+    rm -f /tmp/trino-server.tgz
 
-RUN chmod +x ${PRESTO_HOME}/bin/presto-cli-${PRESTO_VERSION}-executable.jar
+# Download trino CLI
+ADD https://repo1.maven.org/maven2/io/trino/trino-cli/${TRINO_VERSION}/trino-cli-${TRINO_VERSION}-executable.jar ${TRINO_HOME}/bin/
 
-ARG PRESTO_TILEDB_VERSION=latest
+RUN chmod +x ${TRINO_HOME}/bin/trino-cli-${TRINO_VERSION}-executable.jar
 
-# Download latest presto release
-RUN mkdir ${PRESTO_HOME}/plugin/tiledb && \
-    cd ${PRESTO_HOME}/plugin/tiledb && \
-    curl -s https://api.github.com/repos/TileDB-Inc/TileDB-Trino/releases/${PRESTO_TILEDB_VERSION} \
+ARG TRINO_TILEDB_VERSION=1.17.2
+
+# Download latest trino release
+RUN mkdir ${TRINO_HOME}/plugin/tiledb && \
+    cd ${TRINO_HOME}/plugin/tiledb && \
+    curl -s https://api.github.com/repos/TileDB-Inc/TileDB-Trino/releases/tags/${TRINO_TILEDB_VERSION} \
     | grep "browser_download_url.*jar" \
     | cut -d : -f 2,3 \
     | tr -d \" \
     | wget -i -
 
-# Add entry script to start presto server and cli
-ADD docker/entrypoint.sh ${PRESTO_HOME}/bin/
+# Add entry script to start trino server and cli
+ADD docker/entrypoint.sh ${TRINO_HOME}/bin/
 
-RUN chmod +x ${PRESTO_HOME}/bin/entrypoint.sh
+RUN chmod +x ${TRINO_HOME}/bin/entrypoint.sh
 
 # Add example arrays
 ADD src/test/resources/tiledb_arrays /opt/tiledb_example_arrays
 
-WORKDIR ${PRESTO_HOME}
+WORKDIR ${TRINO_HOME}
 
 # Add configuration parameters
-COPY docker/etc ${PRESTO_HOME}/etc
+COPY docker/etc ${TRINO_HOME}/etc
 
-# Expose port for presto ui
+# Expose port for trino ui
 EXPOSE 8080
 
-ENV PATH=${PATH}:"${PRESTO_HOME}/bin"
+ENV PATH=${PATH}:"${TRINO_HOME}/bin"
 
 # Volumes for config and data (used for stats)
-VOLUME ["${PRESTO_HOME}/etc", "${PRESTO_HOME}/data"]
+VOLUME ["${TRINO_HOME}/etc", "${TRINO_HOME}/data"]
 
 # Set default command to entry point script
 CMD ["./bin/entrypoint.sh"]

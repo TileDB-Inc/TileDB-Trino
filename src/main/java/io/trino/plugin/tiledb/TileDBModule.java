@@ -123,6 +123,7 @@ public class TileDBModule
                 return BIGINT;
             case TILEDB_STRING_ASCII:
             case TILEDB_CHAR:
+            case TILEDB_STRING_UTF8:
                 return VARCHAR;
             case TILEDB_FLOAT32:
                 return REAL;
