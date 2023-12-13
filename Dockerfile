@@ -7,7 +7,7 @@ ENV TRINO_CONF_DIR=${TRINO_HOME}/etc
 
 # Install necessary packages including curl, ca-certificates, wget, Python 3, and Java 17
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates wget python-is-python3 openjdk-17-jdk less && \
+    apt-get install -y --no-install-recommends curl ca-certificates wget python-is-python3 openjdk-17-jdk && \
     rm -rf /var/lib/apt/lists/*
 
 
