@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'adopt'
-          java-version: '17'
+          java-version: '21'
           check-latest: true
 
       - run: |
@@ -51,7 +51,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'adopt'
-          java-version: '17'
+          java-version: '21'
           check-latest: true
 
       - name: Checkout
