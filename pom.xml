@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.trino</groupId>
         <artifactId>trino-root</artifactId>
-        <version>438</version>
+        <version>439</version>
     </parent>
 
     <artifactId>trino-tiledb</artifactId>
@@ -150,7 +150,7 @@
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-testing</artifactId>
-            <version>438</version>
+            <version>439</version>
             <scope>test</scope>
         </dependency>
 
