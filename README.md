@@ -1,3 +1,5 @@
+<h2>This repository is currently archived, please get in touch via <a href="mailto:hello@tiledb.com">hello@tiledb.com</a> or the <a href="https://forum.tiledb.io/">TileDB Forum</a> if you have a use-case to discuss.</h2>
+
 # TileDB Trino Connector
 
 ![TileDB-Trino CI](https://github.com/TileDB-Inc/TileDB-Trino/actions/workflows/github_actions.yml/badge.svg)
